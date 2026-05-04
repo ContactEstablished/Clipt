@@ -1,0 +1,12 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>preview</LangVersion>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <UseSharedCompilation>false</UseSharedCompilation>
+    <!-- Keep warning-as-error builds deterministic when NuGet audit feeds are unavailable; CI can add a dedicated audit later. -->
+    <NuGetAudit>false</NuGetAudit>
+  </PropertyGroup>
+</Project>

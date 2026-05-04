@@ -1,0 +1,15 @@
+<UserControl x:Class="Clipt.App.Controls.MarkdownPreviewControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:md="clr-namespace:Markdig.Wpf;assembly=Markdig.Wpf">
+    <Border Background="#121215"
+            BorderBrush="{DynamicResource Clipt.Brush.Border}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="18">
+        <md:MarkdownViewer Markdown="{Binding Markdown, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                           Foreground="{DynamicResource Clipt.Brush.Text}"
+                           FontFamily="{StaticResource Clipt.Font.Ui}"
+                           FontSize="14" />
+    </Border>
+</UserControl>

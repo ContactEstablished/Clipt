@@ -1,0 +1,127 @@
+<UserControl x:Class="Clipt.App.Views.PreviewPane"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:Clipt.App.Controls"
+             xmlns:converters="clr-namespace:Clipt.App.Converters">
+    <UserControl.Resources>
+        <converters:ContentTypeLabelConverter x:Key="ContentTypeLabelConverter" />
+        <converters:ContentTypeVisibilityConverter x:Key="ContentTypeVisibilityConverter" />
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+        <converters:HexColorBrushConverter x:Key="HexColorBrushConverter" />
+    </UserControl.Resources>
+
+    <Grid Margin="18,16,18,18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <DockPanel Grid.Row="0" LastChildFill="False">
+            <Border Padding="10,5"
+                    Background="{DynamicResource Clipt.Brush.AccentSoft}"
+                    BorderBrush="{DynamicResource Clipt.Brush.Accent}"
+                    BorderThickness="1"
+                    CornerRadius="999">
+                <TextBlock FontSize="12"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource Clipt.Brush.Accent}"
+                           Text="{Binding ContentType, Converter={StaticResource ContentTypeLabelConverter}}" />
+            </Border>
+            <TextBlock Margin="10,0,0,0"
+                       VerticalAlignment="Center"
+                       FontSize="12"
+                       Foreground="{DynamicResource Clipt.Brush.TextMuted}"
+                       Text="{Binding SourceAppName}" />
+            <TextBlock Margin="10,0,0,0"
+                       VerticalAlignment="Center"
+                       FontSize="13"
+                       Foreground="{DynamicResource Clipt.Brush.Accent}"
+                       Text="Pinned"
+                       Visibility="{Binding IsPinned, Converter={StaticResource BoolToVisibilityConverter}}" />
+        </DockPanel>
+
+        <Grid Grid.Row="1" Margin="0,16,0,16">
+            <controls:MarkdownPreviewControl Markdown="{Binding Content}"
+                                             Visibility="{Binding ContentType, Converter={StaticResource ContentTypeVisibilityConverter}, ConverterParameter=Markdown}" />
+
+            <controls:CodePreviewControl Text="{Binding Content}"
+                                         SyntaxLanguage="{Binding Language}"
+                                         Visibility="{Binding ContentType, Converter={StaticResource ContentTypeVisibilityConverter}, ConverterParameter=Code|Json}" />
+
+            <controls:ImagePreviewControl ImageUri="{Binding ImageUri}"
+                                          Visibility="{Binding ContentType, Converter={StaticResource ContentTypeVisibilityConverter}, ConverterParameter=Image}" />
+
+            <Border Background="#101014"
+                    BorderBrush="{DynamicResource Clipt.Brush.Border}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="18"
+                    Visibility="{Binding ContentType, Converter={StaticResource ContentTypeVisibilityConverter}, ConverterParameter=Color}">
+                <StackPanel>
+                    <Border Width="160"
+                            Height="96"
+                            HorizontalAlignment="Left"
+                            Background="{Binding Content, Converter={StaticResource HexColorBrushConverter}}"
+                            BorderBrush="{DynamicResource Clipt.Brush.Border}"
+                            BorderThickness="1"
+                            CornerRadius="8" />
+                    <TextBlock Margin="0,18,0,0"
+                               FontFamily="{StaticResource Clipt.Font.Mono}"
+                               FontSize="20"
+                               FontWeight="SemiBold"
+                               Text="{Binding Content}" />
+                    <TextBlock Margin="0,8,0,0"
+                               FontSize="13"
+                               Foreground="{DynamicResource Clipt.Brush.TextSecondary}"
+                               Text="{Binding PreviewText}" />
+                </StackPanel>
+            </Border>
+
+            <Border Background="#101014"
+                    BorderBrush="{DynamicResource Clipt.Brush.Border}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="18"
+                    Visibility="{Binding ContentType, Converter={StaticResource ContentTypeVisibilityConverter}, ConverterParameter=Text|Url}">
+                <TextBox Background="Transparent"
+                         BorderThickness="0"
+                         FontFamily="{StaticResource Clipt.Font.Ui}"
+                         FontSize="15"
+                         Foreground="{DynamicResource Clipt.Brush.Text}"
+                         IsReadOnly="True"
+                         Text="{Binding Content}"
+                         TextWrapping="Wrap"
+                         VerticalScrollBarVisibility="Auto" />
+            </Border>
+
+            <Border Background="#101014"
+                    BorderBrush="{DynamicResource Clipt.Brush.Border}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="18"
+                    Visibility="{Binding ContentType, Converter={StaticResource ContentTypeVisibilityConverter}, ConverterParameter=File}">
+                <ItemsControl ItemsSource="{Binding FilePaths}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Margin="0,0,0,8"
+                                    Padding="12"
+                                    Background="{DynamicResource Clipt.Brush.Surface}"
+                                    CornerRadius="7">
+                                <TextBlock FontFamily="{StaticResource Clipt.Font.Mono}"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource Clipt.Brush.TextSecondary}"
+                                           Text="{Binding}" />
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+        </Grid>
+
+        <DockPanel Grid.Row="2" LastChildFill="False">
+            <Button Margin="0,0,8,0" Content="Paste · Enter" />
+            <Button Content="Copy · Shift+Enter" />
+        </DockPanel>
+    </Grid>
+</UserControl>

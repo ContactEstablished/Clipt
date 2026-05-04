@@ -44,6 +44,8 @@ artifacts/
 
 # Restore output
 .dotnet/
+.dotnet-home/
+.appdata/
 *.nuget.props
 *.nuget.targets
 

@@ -1,0 +1,10 @@
+<ContextMenu x:Class="Clipt.App.Views.TrayContextMenu"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <MenuItem Header="Open Clipt" />
+    <MenuItem Header="Pause capturing" />
+    <Separator />
+    <MenuItem Header="Settings" />
+    <MenuItem Header="About" />
+    <MenuItem Header="Quit" />
+</ContextMenu>

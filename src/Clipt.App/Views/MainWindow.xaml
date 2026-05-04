@@ -1,0 +1,376 @@
+<Window x:Class="Clipt.App.Views.MainWindow"
+        x:Name="RootWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:converters="clr-namespace:Clipt.App.Converters"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        xmlns:tb="clr-namespace:H.NotifyIcon;assembly=H.NotifyIcon.Wpf"
+        xmlns:views="clr-namespace:Clipt.App.Views"
+        Title="Clipt"
+        Width="380"
+        Height="640"
+        MinWidth="360"
+        MinHeight="520"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
+        ResizeMode="CanResizeWithGrip"
+        AllowsTransparency="False"
+        Background="{DynamicResource Clipt.Brush.Background}"
+        KeyDown="OnWindowKeyDown"
+        Closing="OnWindowClosing"
+        Loaded="OnWindowLoaded"
+        SourceInitialized="OnSourceInitialized">
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="0"
+                            CornerRadius="12"
+                            GlassFrameThickness="0"
+                            ResizeBorderThickness="8"
+                            UseAeroCaptionButtons="False" />
+    </shell:WindowChrome.WindowChrome>
+
+    <Window.Resources>
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+        <converters:ClipboardViewVisibilityConverter x:Key="ClipboardViewVisibilityConverter" />
+        <converters:ContentTypeIconConverter x:Key="ContentTypeIconConverter" />
+        <converters:ContentTypeLabelConverter x:Key="ContentTypeLabelConverter" />
+        <converters:HighlightTextConverter x:Key="HighlightTextConverter" />
+        <converters:NavigationBrushConverter x:Key="NavigationBrushConverter" />
+        <converters:TimestampConverter x:Key="TimestampConverter" />
+    </Window.Resources>
+
+    <Grid>
+        <tb:TaskbarIcon x:Name="TrayIcon"
+                        ToolTipText="Clipt"
+                        IconSource="/Resources/Icons/Clipt.ico"
+                        MenuActivation="RightClick"
+                        LeftClickCommand="{Binding ShowFromTrayCommand, RelativeSource={RelativeSource AncestorType=Window}}">
+            <tb:TaskbarIcon.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Open Clipt" Click="OnOpenTrayClick" />
+                    <MenuItem Header="Pause capturing" IsCheckable="True" />
+                    <Separator />
+                    <MenuItem Header="Settings" Click="OnSettingsTrayClick" />
+                    <MenuItem Header="About" Click="OnAboutTrayClick" />
+                    <MenuItem Header="Quit" Click="OnQuitTrayClick" />
+                </ContextMenu>
+            </tb:TaskbarIcon.ContextMenu>
+        </tb:TaskbarIcon>
+
+        <Border Margin="10"
+                Background="{DynamicResource Clipt.Brush.Window}"
+                BorderBrush="{DynamicResource Clipt.Brush.Border}"
+                BorderThickness="1"
+                CornerRadius="12"
+                ClipToBounds="True">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="48" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0"
+                        Background="#121215"
+                        BorderBrush="{DynamicResource Clipt.Brush.Border}"
+                        BorderThickness="0,0,1,0">
+                    <StackPanel Margin="0,16,0,0">
+                        <Button Style="{StaticResource IconButtonStyle}"
+                                ToolTip="Clipboard"
+                                Command="{Binding NavigateCommand}"
+                                CommandParameter="Clipboard">
+                            <Path Width="20"
+                                  Height="20"
+                                  Data="M8 4h8a2 2 0 0 1 2 2v14H6V6a2 2 0 0 1 2-2z M9 4a3 3 0 0 1 6 0"
+                                  Stretch="Uniform"
+                                  Stroke="{Binding ActiveNavigationItem, Converter={StaticResource NavigationBrushConverter}, ConverterParameter=Clipboard}"
+                                  StrokeThickness="1.9" />
+                        </Button>
+                        <Button Margin="0,10,0,0"
+                                Style="{StaticResource IconButtonStyle}"
+                                ToolTip="Pinned"
+                                Command="{Binding NavigateCommand}"
+                                CommandParameter="Pins">
+                            <Path Width="20"
+                                  Height="20"
+                                  Data="M12 2l2.9 6 6.6.9-4.8 4.7 1.1 6.5L12 17l-5.8 3.1 1.1-6.5-4.8-4.7 6.6-.9z"
+                                  Stretch="Uniform"
+                                  Stroke="{Binding ActiveNavigationItem, Converter={StaticResource NavigationBrushConverter}, ConverterParameter=Pins}"
+                                  StrokeThickness="1.9" />
+                        </Button>
+                        <Button Margin="0,10,0,0"
+                                Style="{StaticResource IconButtonStyle}"
+                                ToolTip="Tags"
+                                Command="{Binding NavigateCommand}"
+                                CommandParameter="Tags">
+                            <Path Width="20"
+                                  Height="20"
+                                  Data="M20.6 13.1l-7.5 7.5a2 2 0 0 1-2.8 0L3 13.3V3h10.3l7.3 7.3a2 2 0 0 1 0 2.8z M7.5 7.5h.01"
+                                  Stretch="Uniform"
+                                  Stroke="{Binding ActiveNavigationItem, Converter={StaticResource NavigationBrushConverter}, ConverterParameter=Tags}"
+                                  StrokeThickness="1.9" />
+                        </Button>
+                        <Button Margin="0,10,0,0"
+                                Style="{StaticResource IconButtonStyle}"
+                                ToolTip="Trash"
+                                Command="{Binding NavigateCommand}"
+                                CommandParameter="Trash">
+                            <Path Width="20"
+                                  Height="20"
+                                  Data="M3 6h18 M8 6V4h8v2 M6 6l1 15h10l1-15 M10 11v6 M14 11v6"
+                                  Stretch="Uniform"
+                                  Stroke="{Binding ActiveNavigationItem, Converter={StaticResource NavigationBrushConverter}, ConverterParameter=Trash}"
+                                  StrokeThickness="1.9" />
+                        </Button>
+                    </StackPanel>
+                </Border>
+
+                <Grid Grid.Column="1">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="48" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0"
+                          MouseLeftButtonDown="OnTitleBarMouseLeftButtonDown">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Margin="16,0,0,0"
+                                    VerticalAlignment="Center"
+                                    Orientation="Horizontal">
+                            <TextBlock FontSize="15"
+                                       FontWeight="SemiBold"
+                                       Text="Clipt" />
+                            <Border Margin="10,0,0,0"
+                                    Padding="8,3"
+                                    Background="{DynamicResource Clipt.Brush.AccentSoft}"
+                                    CornerRadius="999">
+                                <TextBlock FontSize="11"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource Clipt.Brush.Accent}"
+                                           Text="{Binding ModeLabel}" />
+                            </Border>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1"
+                                    Margin="0,0,10,0"
+                                    VerticalAlignment="Center"
+                                    Orientation="Horizontal">
+                            <Button Click="OnToggleModeClick"
+                                    Style="{StaticResource IconButtonStyle}"
+                                    ToolTip="Toggle capture/work mode">
+                                <Path Width="16"
+                                      Height="16"
+                                      Data="M4 5h16 M4 12h16 M4 19h16"
+                                      Stretch="Uniform"
+                                      Stroke="{DynamicResource Clipt.Brush.Accent}"
+                                      StrokeThickness="2" />
+                            </Button>
+                            <Button Click="OnMinimizeClick"
+                                    Style="{StaticResource IconButtonStyle}"
+                                    ToolTip="Minimize">
+                                <Path Width="14"
+                                      Height="14"
+                                      Data="M4 12h16"
+                                      Stretch="Uniform"
+                                      Stroke="{DynamicResource Clipt.Brush.TextSecondary}"
+                                      StrokeThickness="2" />
+                            </Button>
+                            <Button Click="OnCloseClick"
+                                    Style="{StaticResource IconButtonStyle}"
+                                    ToolTip="Close">
+                                <Path Width="14"
+                                      Height="14"
+                                      Data="M6 6l12 12 M18 6L6 18"
+                                      Stretch="Uniform"
+                                      Stroke="{DynamicResource Clipt.Brush.TextSecondary}"
+                                      StrokeThickness="2" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Grid.Row="1">
+                        <Grid Visibility="{Binding ActiveNavigationItem, Converter={StaticResource ClipboardViewVisibilityConverter}}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition x:Name="ListColumn" Width="*" MinWidth="300" />
+                                <ColumnDefinition x:Name="PreviewColumn" Width="0" MinWidth="0" />
+                            </Grid.ColumnDefinitions>
+
+                            <Grid Grid.Column="0" Margin="14,0,12,14">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <TextBox Grid.Row="0"
+                                         Margin="0,0,0,12"
+                                         Style="{StaticResource SearchBoxStyle}"
+                                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
+
+                                <ListBox Grid.Row="1"
+                                         Background="Transparent"
+                                         BorderThickness="0"
+                                         ItemsSource="{Binding ItemsView}"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                         SelectedItem="{Binding SelectedItem, Mode=TwoWay}">
+                                    <ListBox.GroupStyle>
+                                        <GroupStyle>
+                                            <GroupStyle.HeaderTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Margin="4,12,0,6"
+                                                               FontSize="11"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource Clipt.Brush.TextMuted}"
+                                                               Text="{Binding Name}" />
+                                                </DataTemplate>
+                                            </GroupStyle.HeaderTemplate>
+                                        </GroupStyle>
+                                    </ListBox.GroupStyle>
+                                    <ListBox.ItemContainerStyle>
+                                        <Style TargetType="{x:Type ListBoxItem}">
+                                            <Setter Property="Padding" Value="0" />
+                                            <Setter Property="Margin" Value="0,0,0,6" />
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            <Setter Property="Background" Value="Transparent" />
+                                            <Setter Property="BorderThickness" Value="0" />
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="{x:Type ListBoxItem}">
+                                                        <Border x:Name="ItemBorder"
+                                                                Background="{TemplateBinding Background}"
+                                                                CornerRadius="8">
+                                                            <ContentPresenter />
+                                                        </Border>
+                                                        <ControlTemplate.Triggers>
+                                                            <Trigger Property="IsSelected" Value="True">
+                                                                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource Clipt.Brush.AccentSoft}" />
+                                                            </Trigger>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter TargetName="ItemBorder" Property="Background" Value="#222227" />
+                                                            </Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </ListBox.ItemContainerStyle>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid>
+                                                <Grid Height="32"
+                                                      Visibility="{Binding DataContext.IsWorkMode, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="3" />
+                                                        <ColumnDefinition Width="30" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="42" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border Background="{DynamicResource Clipt.Brush.Accent}"
+                                                            CornerRadius="8,0,0,8"
+                                                            Visibility="{Binding IsPinned, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                    <Path Grid.Column="1"
+                                                          Width="18"
+                                                          Height="18"
+                                                          Data="{Binding ContentType, Converter={StaticResource ContentTypeIconConverter}}"
+                                                          Stretch="Uniform"
+                                                          Stroke="{DynamicResource Clipt.Brush.Accent}"
+                                                          StrokeThickness="1.8" />
+                                                    <ContentPresenter Grid.Column="2" VerticalAlignment="Center">
+                                                        <ContentPresenter.Content>
+                                                            <MultiBinding Converter="{StaticResource HighlightTextConverter}" ConverterParameter="12">
+                                                                <Binding Path="Title" />
+                                                                <Binding Path="DataContext.SearchText" RelativeSource="{RelativeSource AncestorType=Window}" />
+                                                            </MultiBinding>
+                                                        </ContentPresenter.Content>
+                                                    </ContentPresenter>
+                                                    <TextBlock Grid.Column="3"
+                                                               HorizontalAlignment="Right"
+                                                               VerticalAlignment="Center"
+                                                               FontSize="11"
+                                                               Foreground="{DynamicResource Clipt.Brush.TextMuted}"
+                                                               Text="{Binding CreatedAt, Converter={StaticResource TimestampConverter}}" />
+                                                </Grid>
+
+                                                <Grid MinHeight="56"
+                                                      Visibility="{Binding DataContext.IsWorkMode, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="3" />
+                                                        <ColumnDefinition Width="34" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="28" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border Background="{DynamicResource Clipt.Brush.Accent}"
+                                                            CornerRadius="8,0,0,8"
+                                                            Visibility="{Binding IsPinned, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                    <Path Grid.Column="1"
+                                                          Width="19"
+                                                          Height="19"
+                                                          Data="{Binding ContentType, Converter={StaticResource ContentTypeIconConverter}}"
+                                                          Stretch="Uniform"
+                                                          Stroke="{DynamicResource Clipt.Brush.Accent}"
+                                                          StrokeThickness="1.8" />
+                                                    <StackPanel Grid.Column="2"
+                                                                Margin="0,7,8,7">
+                                                        <ContentPresenter>
+                                                            <ContentPresenter.Content>
+                                                                <MultiBinding Converter="{StaticResource HighlightTextConverter}" ConverterParameter="13">
+                                                                    <Binding Path="Title" />
+                                                                    <Binding Path="DataContext.SearchText" RelativeSource="{RelativeSource AncestorType=Window}" />
+                                                                </MultiBinding>
+                                                            </ContentPresenter.Content>
+                                                        </ContentPresenter>
+                                                        <TextBlock Margin="0,3,0,0"
+                                                                   FontSize="12"
+                                                                   Foreground="{DynamicResource Clipt.Brush.TextSecondary}"
+                                                                   Text="{Binding PreviewText}"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Margin="0,3,0,0"
+                                                                   FontSize="11"
+                                                                   Foreground="{DynamicResource Clipt.Brush.TextMuted}">
+                                                            <Run Text="{Binding SourceAppName}" />
+                                                            <Run Text=" · " />
+                                                            <Run Text="{Binding CreatedAt, Converter={StaticResource TimestampConverter}}" />
+                                                        </TextBlock>
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="3"
+                                                               HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center"
+                                                               FontSize="14"
+                                                               Foreground="{DynamicResource Clipt.Brush.Accent}"
+                                                               Text="★"
+                                                               Visibility="{Binding IsPinned, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                </Grid>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Grid>
+
+                            <Border Grid.Column="1"
+                                    BorderBrush="{DynamicResource Clipt.Brush.Border}"
+                                    BorderThickness="1,0,0,0"
+                                    Visibility="{Binding IsWorkMode, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <views:PreviewPane DataContext="{Binding SelectedItem}" />
+                            </Border>
+                        </Grid>
+
+                        <Grid Visibility="{Binding ActiveNavigationItem, Converter={StaticResource ClipboardViewVisibilityConverter}, ConverterParameter=Invert}">
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock HorizontalAlignment="Center"
+                                           FontSize="18"
+                                           FontWeight="SemiBold"
+                                           Text="{Binding ActiveNavigationItem}" />
+                                <TextBlock Margin="0,8,0,0"
+                                           HorizontalAlignment="Center"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource Clipt.Brush.TextSecondary}"
+                                           Text="Coming soon" />
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

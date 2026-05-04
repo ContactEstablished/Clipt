@@ -1,0 +1,1 @@
+-- Phase 1 placeholder. Real SQLite schema arrives in Phase 2.

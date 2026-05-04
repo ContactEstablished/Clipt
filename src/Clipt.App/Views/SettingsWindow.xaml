@@ -1,0 +1,14 @@
+<Window x:Class="Clipt.App.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Clipt Settings"
+        Width="720"
+        Height="520"
+        Background="{DynamicResource Clipt.Brush.Background}">
+    <Grid>
+        <TextBlock HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   Foreground="{DynamicResource Clipt.Brush.TextSecondary}"
+                   Text="Settings arrive in Phase 2." />
+    </Grid>
+</Window>
