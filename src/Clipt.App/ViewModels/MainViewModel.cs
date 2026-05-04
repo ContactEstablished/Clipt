@@ -10,10 +10,13 @@ namespace Clipt.App.ViewModels;
 public sealed partial class MainViewModel : ObservableObject
 {
     private readonly IHistoryService _historyService;
+    private readonly IClipboardMonitor _clipboardMonitor;
 
-    public MainViewModel(IHistoryService historyService)
+    public MainViewModel(IHistoryService historyService, IClipboardMonitor clipboardMonitor)
     {
         _historyService = historyService;
+        _clipboardMonitor = clipboardMonitor;
+        _clipboardMonitor.ClipboardItemCaptured += OnClipboardItemCaptured;
         ItemsView = CollectionViewSource.GetDefaultView(Items);
         ItemsView.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ClipboardItemViewModel.GroupName)));
         ItemsView.SortDescriptions.Add(new SortDescription(nameof(ClipboardItemViewModel.IsPinned), ListSortDirection.Descending));
@@ -98,5 +101,12 @@ public sealed partial class MainViewModel : ObservableObject
         return item.Title.Contains(SearchText, StringComparison.OrdinalIgnoreCase)
             || item.PreviewText.Contains(SearchText, StringComparison.OrdinalIgnoreCase)
             || item.Content.Contains(SearchText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void OnClipboardItemCaptured(object? sender, Clipt.Core.Models.ClipboardItem item)
+    {
+        var viewModel = new ClipboardItemViewModel(item);
+        Items.Insert(0, viewModel);
+        SelectedItem = viewModel;
     }
 }

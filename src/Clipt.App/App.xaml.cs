@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Threading;
+using Clipt.App.Services;
 using Clipt.App.ViewModels;
 using Clipt.App.Views;
 using Clipt.Core.Services;
@@ -75,7 +76,9 @@ public partial class App : Application
         builder.Services.AddSingleton<ISearchService, SearchService>();
         builder.Services.AddSingleton<IContentTypeDetector, ContentTypeDetector>();
         builder.Services.AddSingleton<IPrivacyFilter, PrivacyFilter>();
+        builder.Services.AddSingleton<IClipboardMonitor, WpfClipboardMonitor>();
         builder.Services.AddHostedService<AppLifecycleService>();
+        builder.Services.AddHostedService<ClipboardMonitorHostedService>();
 
         builder.Services.AddSingleton<MainViewModel>();
         builder.Services.AddTransient<PreviewViewModel>();
