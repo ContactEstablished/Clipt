@@ -2,7 +2,5 @@
   <PropertyGroup>
     <TargetFramework>net9.0-windows</TargetFramework>
     <UseWPF>false</UseWPF>
-    <!-- LibraryImport source generation emits unsafe stubs; keep it isolated in Interop. -->
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 </Project>

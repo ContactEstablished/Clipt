@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Threading;
 using Clipt.App.ViewModels;
 using Clipt.App.Views;
 using Clipt.Core.Services;
@@ -18,11 +19,23 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        _host = CreateHost();
-        await _host.StartAsync();
+        DispatcherUnhandledException += OnDispatcherUnhandledException;
+        AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
 
-        var mainWindow = _host.Services.GetRequiredService<MainWindow>();
-        mainWindow.Show();
+        try
+        {
+            _host = CreateHost();
+            await _host.StartAsync();
+
+            var mainWindow = _host.Services.GetRequiredService<MainWindow>();
+            mainWindow.Show();
+        }
+        catch (Exception exception)
+        {
+            Log.Fatal(exception, "Clipt failed during startup.");
+            MessageBox.Show(exception.ToString(), "Clipt startup failed", MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown(-1);
+        }
     }
 
     protected override async void OnExit(ExitEventArgs e)
@@ -70,5 +83,19 @@ public partial class App : Application
         builder.Services.AddSingleton<MainWindow>();
 
         return builder.Build();
+    }
+
+    private static void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+    {
+        Log.Fatal(e.Exception, "Unhandled UI exception.");
+        e.Handled = false;
+    }
+
+    private static void OnDomainUnhandledException(object sender, UnhandledExceptionEventArgs e)
+    {
+        if (e.ExceptionObject is Exception exception)
+        {
+            Log.Fatal(exception, "Unhandled domain exception.");
+        }
     }
 }

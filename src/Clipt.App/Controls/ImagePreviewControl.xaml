@@ -6,7 +6,7 @@
             BorderThickness="1"
             CornerRadius="8"
             Padding="12">
-        <Image Source="{Binding ImageUri, RelativeSource={RelativeSource AncestorType=UserControl}}"
+        <Image Source="{Binding ImageSource, RelativeSource={RelativeSource AncestorType=UserControl}}"
                Stretch="Uniform"
                RenderOptions.BitmapScalingMode="HighQuality" />
     </Border>

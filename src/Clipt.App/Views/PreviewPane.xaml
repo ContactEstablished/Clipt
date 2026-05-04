@@ -45,8 +45,8 @@
             <controls:MarkdownPreviewControl Markdown="{Binding Content}"
                                              Visibility="{Binding ContentType, Converter={StaticResource ContentTypeVisibilityConverter}, ConverterParameter=Markdown}" />
 
-            <controls:CodePreviewControl Text="{Binding Content}"
-                                         SyntaxLanguage="{Binding Language}"
+            <controls:CodePreviewControl Text="{Binding Content, Mode=OneWay}"
+                                         SyntaxLanguage="{Binding Language, Mode=OneWay}"
                                          Visibility="{Binding ContentType, Converter={StaticResource ContentTypeVisibilityConverter}, ConverterParameter=Code|Json}" />
 
             <controls:ImagePreviewControl ImageUri="{Binding ImageUri}"
@@ -70,11 +70,11 @@
                                FontFamily="{StaticResource Clipt.Font.Mono}"
                                FontSize="20"
                                FontWeight="SemiBold"
-                               Text="{Binding Content}" />
+                               Text="{Binding Content, Mode=OneWay}" />
                     <TextBlock Margin="0,8,0,0"
                                FontSize="13"
                                Foreground="{DynamicResource Clipt.Brush.TextSecondary}"
-                               Text="{Binding PreviewText}" />
+                               Text="{Binding PreviewText, Mode=OneWay}" />
                 </StackPanel>
             </Border>
 
@@ -90,7 +90,7 @@
                          FontSize="15"
                          Foreground="{DynamicResource Clipt.Brush.Text}"
                          IsReadOnly="True"
-                         Text="{Binding Content}"
+                         Text="{Binding Content, Mode=OneWay}"
                          TextWrapping="Wrap"
                          VerticalScrollBarVisibility="Auto" />
             </Border>

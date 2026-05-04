@@ -166,9 +166,30 @@ public partial class MainWindow : Window
             return;
         }
 
-        var hwnd = new WindowInteropHelper(this).Handle;
-        SetDwmAttribute(hwnd, NativeMethods.DwmwaWindowCornerPreference, DwmCornerPreferenceRound);
-        SetDwmAttribute(hwnd, NativeMethods.DwmwaSystemBackdropType, DwmBackdropMica);
+        try
+        {
+            var hwnd = new WindowInteropHelper(this).Handle;
+            if (hwnd == 0)
+            {
+                _logger.LogDebug("Skipping DWM backdrop because the window handle is not initialized.");
+                return;
+            }
+
+            SetDwmAttribute(hwnd, NativeMethods.DwmwaWindowCornerPreference, DwmCornerPreferenceRound);
+            SetDwmAttribute(hwnd, NativeMethods.DwmwaSystemBackdropType, DwmBackdropMica);
+        }
+        catch (DllNotFoundException exception)
+        {
+            _logger.LogDebug(exception, "DWM API is unavailable; using the solid dark fallback.");
+        }
+        catch (EntryPointNotFoundException exception)
+        {
+            _logger.LogDebug(exception, "DWM backdrop entry point is unavailable; using the solid dark fallback.");
+        }
+        catch (ExternalException exception)
+        {
+            _logger.LogDebug(exception, "DWM backdrop setup failed; using the solid dark fallback.");
+        }
     }
 
     private void SetDwmAttribute(nint hwnd, int attribute, int value)

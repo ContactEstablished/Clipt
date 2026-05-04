@@ -22,7 +22,7 @@
         SourceInitialized="OnSourceInitialized">
     <shell:WindowChrome.WindowChrome>
         <shell:WindowChrome CaptionHeight="0"
-                            CornerRadius="12"
+                            CornerRadius="0"
                             GlassFrameThickness="0"
                             ResizeBorderThickness="8"
                             UseAeroCaptionButtons="False" />
@@ -328,9 +328,9 @@
                                                         <TextBlock Margin="0,3,0,0"
                                                                    FontSize="11"
                                                                    Foreground="{DynamicResource Clipt.Brush.TextMuted}">
-                                                            <Run Text="{Binding SourceAppName}" />
+                                                            <Run Text="{Binding SourceAppName, Mode=OneWay}" />
                                                             <Run Text=" · " />
-                                                            <Run Text="{Binding CreatedAt, Converter={StaticResource TimestampConverter}}" />
+                                                            <Run Text="{Binding CreatedAt, Converter={StaticResource TimestampConverter}, Mode=OneWay}" />
                                                         </TextBlock>
                                                     </StackPanel>
                                                     <TextBlock Grid.Column="3"
