@@ -96,6 +96,23 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (e.Key is Key.Delete or Key.Back)
+        {
+            // Do not delete while the user is editing text in the search box.
+            if (Keyboard.FocusedElement == SearchBox)
+            {
+                return;
+            }
+
+            if (_viewModel.SelectedItem is not null)
+            {
+                _viewModel.DeleteItemCommand.Execute(_viewModel.SelectedItem);
+            }
+
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key == Key.P && Keyboard.Modifiers == ModifierKeys.Control)
         {
             if (_viewModel.SelectedItem is not null)
@@ -200,6 +217,23 @@ public partial class MainWindow : Window
         _pendingSave = _pendingSave with { IsCapturePaused = paused };
         UpdateTrayPauseState(paused);
         await SaveCurrentSettingsAsync();
+    }
+
+    private async void OnClearHistoryTrayClick(object sender, RoutedEventArgs e)
+    {
+        var result = MessageBox.Show(
+            this,
+            "Remove all unpinned clipboard items?\nPinned items will be kept.",
+            "Clear history",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (result != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        await _viewModel.ClearUnpinnedCommand.ExecuteAsync(null);
     }
 
     private void OnSettingsTrayClick(object sender, RoutedEventArgs e)

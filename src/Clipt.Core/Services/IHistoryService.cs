@@ -11,4 +11,8 @@ public interface IHistoryService
     Task<ClipboardItem> SaveAsync(ClipboardItem item, CancellationToken cancellationToken);
 
     Task SetPinnedAsync(Guid id, bool isPinned, CancellationToken cancellationToken);
+
+    Task DeleteAsync(Guid id, CancellationToken cancellationToken);
+
+    Task<int> ClearUnpinnedAsync(CancellationToken cancellationToken);
 }

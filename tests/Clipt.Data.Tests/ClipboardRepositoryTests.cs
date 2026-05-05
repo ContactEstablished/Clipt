@@ -368,6 +368,178 @@ public sealed class ClipboardRepositoryTests : IAsyncDisposable
         }
     }
 
+    [Fact]
+    public async Task DeleteAsync_RemovesRow()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var item = CreateTestItem("Delete me");
+        await _repository.SaveAsync(item, CancellationToken.None);
+
+        await _repository.DeleteAsync(item.Id, CancellationToken.None);
+
+        var items = await _repository.GetItemsAsync(CancellationToken.None);
+        items.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_RemovesSearchableFtsRow()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var item = CreateTestItem("FTS delete target content");
+        await _repository.SaveAsync(item, CancellationToken.None);
+
+        // Verify searchable before delete.
+        var before = await _repository.SearchAsync("delete", CancellationToken.None);
+        before.Should().ContainSingle();
+
+        await _repository.DeleteAsync(item.Id, CancellationToken.None);
+
+        // After delete, FTS should be cleaned via trigger.
+        var after = await _repository.SearchAsync("delete", CancellationToken.None);
+        after.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_UnknownIdIsSafeNoOp()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        await _repository.SaveAsync(CreateTestItem("Keep me"), CancellationToken.None);
+
+        var unknownId = Guid.NewGuid();
+        await _repository.DeleteAsync(unknownId, CancellationToken.None);
+
+        var items = await _repository.GetItemsAsync(CancellationToken.None);
+        items.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task ClearUnpinnedAsync_RemovesOnlyUnpinnedRows()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        await _repository.SaveAsync(CreateTestItem("Pinned A", isPinned: true), CancellationToken.None);
+        await _repository.SaveAsync(CreateTestItem("Unpinned A"), CancellationToken.None);
+        await _repository.SaveAsync(CreateTestItem("Unpinned B"), CancellationToken.None);
+        await _repository.SaveAsync(CreateTestItem("Pinned B", isPinned: true), CancellationToken.None);
+
+        var rowsDeleted = await _repository.ClearUnpinnedAsync(CancellationToken.None);
+        rowsDeleted.Should().Be(2);
+
+        var items = await _repository.GetItemsAsync(CancellationToken.None);
+        items.Should().HaveCount(2);
+        items.Should().AllSatisfy(i => i.IsPinned.Should().BeTrue());
+    }
+
+    [Fact]
+    public async Task ClearUnpinnedAsync_KeepsPinnedRows()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var pinned = CreateTestItem("Must stay", isPinned: true);
+        await _repository.SaveAsync(pinned, CancellationToken.None);
+        await _repository.SaveAsync(CreateTestItem("Will go"), CancellationToken.None);
+
+        await _repository.ClearUnpinnedAsync(CancellationToken.None);
+
+        var items = await _repository.GetItemsAsync(CancellationToken.None);
+        items.Should().ContainSingle();
+        items[0].Id.Should().Be(pinned.Id);
+        items[0].Title.Should().Be("Must stay");
+    }
+
+    [Fact]
+    public async Task ClearUnpinnedAsync_RemovesFtsEntriesForDeletedRows()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        await _repository.SaveAsync(CreateTestItem("Pinned search term", isPinned: true), CancellationToken.None);
+        await _repository.SaveAsync(CreateTestItem("Unpinned search term"), CancellationToken.None);
+
+        // Verify both are searchable.
+        var before = await _repository.SearchAsync("search", CancellationToken.None);
+        before.Should().HaveCount(2);
+
+        await _repository.ClearUnpinnedAsync(CancellationToken.None);
+
+        // After clearing unpinned, only the pinned item should remain searchable.
+        var after = await _repository.SearchAsync("search", CancellationToken.None);
+        after.Should().ContainSingle();
+        after[0].IsPinned.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GetItemsAsync_OrderingRemainsSensibleAfterDeletes()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var pinned = CreateTestItem("Pinned ordered", isPinned: true);
+        var newer = CreateTestItem("Newer ordered");
+        var older = CreateTestItem("Older ordered");
+
+        await _repository.SaveAsync(older, CancellationToken.None);
+        await _repository.SaveAsync(pinned, CancellationToken.None);
+        await _repository.SaveAsync(newer, CancellationToken.None);
+
+        // Delete the newer unpinned item.
+        await _repository.DeleteAsync(newer.Id, CancellationToken.None);
+
+        var items = await _repository.GetItemsAsync(CancellationToken.None);
+        items.Should().HaveCount(2);
+        items[0].IsPinned.Should().BeTrue();
+        items[0].Id.Should().Be(pinned.Id);
+        items[1].Id.Should().Be(older.Id);
+    }
+
+    [Fact]
+    public async Task SearchAsync_OrderingRemainsSensibleAfterDeletes()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var pinnedA = CreateTestItem("Pinned alpha after delete", isPinned: true);
+        var unpinnedA = CreateTestItem("Unpinned bravo after delete");
+        var unpinnedB = CreateTestItem("Unpinned charlie after delete");
+
+        await _repository.SaveAsync(unpinnedA, CancellationToken.None);
+        await _repository.SaveAsync(pinnedA, CancellationToken.None);
+        await _repository.SaveAsync(unpinnedB, CancellationToken.None);
+
+        // Delete the first unpinned item.
+        await _repository.DeleteAsync(unpinnedA.Id, CancellationToken.None);
+
+        var results = await _repository.SearchAsync("after delete", CancellationToken.None);
+        results.Should().HaveCount(2);
+        results[0].IsPinned.Should().BeTrue();
+        results[0].Id.Should().Be(pinnedA.Id);
+        results[1].Id.Should().Be(unpinnedB.Id);
+    }
+
+    [Fact]
+    public async Task ClearUnpinnedAsync_EmptyIsNoOp()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var rowsDeleted = await _repository.ClearUnpinnedAsync(CancellationToken.None);
+        rowsDeleted.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ClearUnpinnedAsync_AllPinnedRemovesNone()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        await _repository.SaveAsync(CreateTestItem("Pinned 1", isPinned: true), CancellationToken.None);
+        await _repository.SaveAsync(CreateTestItem("Pinned 2", isPinned: true), CancellationToken.None);
+
+        var rowsDeleted = await _repository.ClearUnpinnedAsync(CancellationToken.None);
+        rowsDeleted.Should().Be(0);
+
+        var items = await _repository.GetItemsAsync(CancellationToken.None);
+        items.Should().HaveCount(2);
+    }
+
     public async ValueTask DisposeAsync()
     {
         _repository.Dispose();

@@ -28,6 +28,11 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
 
     private HwndSource? _messageSource;
     private string? _lastTextHash;
+
+    // History deletion invalidates in-memory duplicate tracking because
+    // a previously-captured hash may no longer exist in the database.
+    // Callers must invoke ResetDuplicateTracking after removing items.
+
     private AppSettings? _cachedSettings;
     private bool _isPaused;
     private bool _isDisposed;
@@ -75,6 +80,12 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
 
         CaptureStateChanged?.Invoke(this, EventArgs.Empty);
         return Task.CompletedTask;
+    }
+
+    public void ResetDuplicateTracking()
+    {
+        _lastTextHash = null;
+        _logger.LogDebug("Duplicate tracking reset after history mutation.");
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -157,6 +168,7 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
             return 0;
         }
 
+        _logger.LogDebug("Clipboard update message received.");
         handled = true;
         CaptureCurrentTextClipboardItem();
         return 0;
@@ -166,6 +178,7 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
     {
         if (_isPaused)
         {
+            _logger.LogDebug("Clipboard update ignored: capture is paused.");
             return;
         }
 
@@ -173,18 +186,21 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
         {
             if (!Clipboard.ContainsText())
             {
+                _logger.LogDebug("Clipboard update ignored: no text on clipboard.");
                 return;
             }
 
             var text = Clipboard.GetText(TextDataFormat.UnicodeText);
             if (string.IsNullOrWhiteSpace(text))
             {
+                _logger.LogDebug("Clipboard update ignored: text is null or whitespace.");
                 return;
             }
 
             var hash = ClipboardContentHasher.ComputeHash(text);
             if (hash == _lastTextHash)
             {
+                _logger.LogDebug("Clipboard update ignored: duplicate hash {Hash}.", hash);
                 return;
             }
 
@@ -198,6 +214,7 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
             }
 
             _lastTextHash = hash;
+            _logger.LogDebug("Clipboard item captured: '{Title}' (hash {Hash}).", item.Title, hash);
             ClipboardItemCaptured?.Invoke(this, item);
         }
         catch (ExternalException exception)

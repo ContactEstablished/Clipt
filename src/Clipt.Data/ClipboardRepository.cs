@@ -303,6 +303,46 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
         }
     }
 
+    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken)
+    {
+        await _connectionLock.WaitAsync(cancellationToken);
+        try
+        {
+            var connection = await GetConnectionAsync(cancellationToken);
+
+            using var command = connection.CreateCommand();
+            command.CommandText = "DELETE FROM clipboard_items WHERE id = @id";
+            command.Parameters.AddWithValue("@id", id.ToString());
+            await command.ExecuteNonQueryAsync(cancellationToken);
+
+            _logger.LogDebug("Deleted clipboard item {Id}.", id);
+        }
+        finally
+        {
+            _connectionLock.Release();
+        }
+    }
+
+    public async Task<int> ClearUnpinnedAsync(CancellationToken cancellationToken)
+    {
+        await _connectionLock.WaitAsync(cancellationToken);
+        try
+        {
+            var connection = await GetConnectionAsync(cancellationToken);
+
+            using var command = connection.CreateCommand();
+            command.CommandText = "DELETE FROM clipboard_items WHERE is_pinned = 0";
+            var rowsDeleted = await command.ExecuteNonQueryAsync(cancellationToken);
+
+            _logger.LogDebug("Cleared {Count} unpinned clipboard items.", rowsDeleted);
+            return rowsDeleted;
+        }
+        finally
+        {
+            _connectionLock.Release();
+        }
+    }
+
     public void Dispose()
     {
         if (_isDisposed)

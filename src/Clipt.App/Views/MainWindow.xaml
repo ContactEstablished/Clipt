@@ -140,6 +140,7 @@
                               IsCheckable="True"
                               Click="OnPauseCaptureClick" />
                     <Separator />
+                    <MenuItem Header="Clear history" Click="OnClearHistoryTrayClick" />
                     <MenuItem Header="Settings" Click="OnSettingsTrayClick" />
                     <MenuItem Header="About" Click="OnAboutTrayClick" />
                     <MenuItem Header="Quit" Click="OnQuitTrayClick" />

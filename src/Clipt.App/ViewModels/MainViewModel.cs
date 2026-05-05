@@ -101,6 +101,61 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task DeleteItem(ClipboardItemViewModel? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (_isDemoFallback)
+            {
+                _demoItems.RemoveAll(i => i.Id == item.Id);
+                _clipboardMonitor.ResetDuplicateTracking();
+                await RefreshItemsAsync();
+                SelectedItem = GetNextSelectionAfterDelete();
+                return;
+            }
+
+            await _historyService.DeleteAsync(item.Id, CancellationToken.None);
+            _clipboardMonitor.ResetDuplicateTracking();
+            await RefreshItemsAsync();
+            SelectedItem = GetNextSelectionAfterDelete();
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Failed to delete item {Id}.", item.Id);
+        }
+    }
+
+    [RelayCommand]
+    private async Task ClearUnpinned()
+    {
+        try
+        {
+            if (_isDemoFallback)
+            {
+                _demoItems.RemoveAll(i => !i.IsPinned);
+                _clipboardMonitor.ResetDuplicateTracking();
+                await RefreshItemsAsync();
+                SelectedItem = Items.FirstOrDefault();
+                return;
+            }
+
+            await _historyService.ClearUnpinnedAsync(CancellationToken.None);
+            _clipboardMonitor.ResetDuplicateTracking();
+            await RefreshItemsAsync();
+            SelectedItem = Items.FirstOrDefault();
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Failed to clear unpinned items.");
+        }
+    }
+
+    [RelayCommand]
     private async Task TogglePin(ClipboardItemViewModel? item)
     {
         if (item is null)
@@ -206,6 +261,11 @@ public sealed partial class MainViewModel : ObservableObject
         {
             _logger.LogError(exception, "Failed to refresh items.");
         }
+    }
+
+    private ClipboardItemViewModel? GetNextSelectionAfterDelete()
+    {
+        return Items.FirstOrDefault();
     }
 
     private void PopulateItems(IReadOnlyList<Clipt.Core.Models.ClipboardItem> results)
