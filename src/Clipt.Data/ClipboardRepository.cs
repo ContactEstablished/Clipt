@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Clipt.Core.Models;
 using Clipt.Core.Services;
 using Microsoft.Data.Sqlite;
@@ -5,7 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Clipt.Data;
 
-public sealed class ClipboardRepository : IHistoryService, IDisposable
+public sealed partial class ClipboardRepository : IHistoryService, IDisposable
 {
     private readonly DatabasePathProvider _pathProvider;
     private readonly ILogger<ClipboardRepository> _logger;
@@ -63,6 +64,66 @@ public sealed class ClipboardRepository : IHistoryService, IDisposable
         }
     }
 
+    public async Task<IReadOnlyList<ClipboardItem>> SearchAsync(string query, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return await GetItemsAsync(cancellationToken);
+        }
+
+        var ftsQuery = BuildFtsQuery(query);
+        if (string.IsNullOrEmpty(ftsQuery))
+        {
+            return await GetItemsAsync(cancellationToken);
+        }
+
+        await _connectionLock.WaitAsync(cancellationToken);
+        try
+        {
+            var connection = await GetConnectionAsync(cancellationToken);
+
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT
+                    id,
+                    content_hash,
+                    content_type,
+                    title,
+                    preview_text,
+                    content_text,
+                    source_app_name,
+                    source_app_path,
+                    byte_size,
+                    is_pinned,
+                    pin_order,
+                    is_favorite,
+                    created_at,
+                    last_used_at,
+                    use_count
+                FROM clipboard_items
+                WHERE id IN (
+                    SELECT item_id FROM clipboard_items_fts
+                    WHERE clipboard_items_fts MATCH @query
+                )
+                ORDER BY is_pinned DESC, pin_order, created_at DESC
+                """;
+            command.Parameters.AddWithValue("@query", ftsQuery);
+
+            var items = new List<ClipboardItem>();
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                items.Add(MapRow(reader));
+            }
+
+            return items;
+        }
+        finally
+        {
+            _connectionLock.Release();
+        }
+    }
+
     public async Task<ClipboardItem> SaveAsync(ClipboardItem item, CancellationToken cancellationToken)
     {
         await _connectionLock.WaitAsync(cancellationToken);
@@ -97,7 +158,8 @@ public sealed class ClipboardRepository : IHistoryService, IDisposable
             await using var checkReader = await checkCommand.ExecuteReaderAsync(cancellationToken);
             if (await checkReader.ReadAsync(cancellationToken))
             {
-                // Duplicate found: update last_used_at and use_count, return existing item
+                // Duplicate found: update last_used_at and use_count, return existing item.
+                // The UPDATE trigger (trg_clipboard_items_fts_au) keeps FTS in sync automatically.
                 var existingItem = MapRow(checkReader);
                 await checkReader.DisposeAsync();
 
@@ -123,7 +185,8 @@ public sealed class ClipboardRepository : IHistoryService, IDisposable
 
             await checkReader.DisposeAsync();
 
-            // Insert new item
+            // Insert new item.
+            // The INSERT trigger (trg_clipboard_items_fts_ai) populates FTS automatically.
             using var insertCommand = connection.CreateCommand();
             insertCommand.CommandText = """
                 INSERT INTO clipboard_items (
@@ -191,6 +254,55 @@ public sealed class ClipboardRepository : IHistoryService, IDisposable
         }
     }
 
+    public async Task SetPinnedAsync(Guid id, bool isPinned, CancellationToken cancellationToken)
+    {
+        await _connectionLock.WaitAsync(cancellationToken);
+        try
+        {
+            var connection = await GetConnectionAsync(cancellationToken);
+
+            if (isPinned)
+            {
+                // Pin: assign a pin_order above existing pins (or 1 if none).
+                using var maxCommand = connection.CreateCommand();
+                maxCommand.CommandText = "SELECT COALESCE(MAX(pin_order), 0) FROM clipboard_items WHERE is_pinned = 1";
+                var maxPinOrder = (long)(await maxCommand.ExecuteScalarAsync(cancellationToken))!;
+
+                using var pinCommand = connection.CreateCommand();
+                pinCommand.CommandText = """
+                    UPDATE clipboard_items
+                    SET is_pinned = 1,
+                        pin_order = @pin_order
+                    WHERE id = @id
+                    """;
+                pinCommand.Parameters.AddWithValue("@pin_order", (int)(maxPinOrder + 1));
+                pinCommand.Parameters.AddWithValue("@id", id.ToString());
+                await pinCommand.ExecuteNonQueryAsync(cancellationToken);
+
+                _logger.LogDebug("Pinned clipboard item {Id} at pin_order {PinOrder}.", id, maxPinOrder + 1);
+            }
+            else
+            {
+                // Unpin: clear pin_order.
+                using var unpinCommand = connection.CreateCommand();
+                unpinCommand.CommandText = """
+                    UPDATE clipboard_items
+                    SET is_pinned = 0,
+                        pin_order = NULL
+                    WHERE id = @id
+                    """;
+                unpinCommand.Parameters.AddWithValue("@id", id.ToString());
+                await unpinCommand.ExecuteNonQueryAsync(cancellationToken);
+
+                _logger.LogDebug("Unpinned clipboard item {Id}.", id);
+            }
+        }
+        finally
+        {
+            _connectionLock.Release();
+        }
+    }
+
     public void Dispose()
     {
         if (_isDisposed)
@@ -216,6 +328,32 @@ public sealed class ClipboardRepository : IHistoryService, IDisposable
         await _connection.OpenAsync(cancellationToken);
         return _connection;
     }
+
+    /// <summary>
+    /// Sanitises user input into an FTS5 MATCH expression.
+    /// Strips special FTS5 characters, splits into tokens, and applies prefix matching (*) to each token.
+    /// </summary>
+    private static string BuildFtsQuery(string raw)
+    {
+        // Remove FTS5 special characters except alphanumeric, whitespace, and underscore.
+        var sanitised = FtsSpecialCharsRegex().Replace(raw, " ").Trim();
+        if (sanitised.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        var tokens = sanitised.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (tokens.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        // Quote each token and append * for prefix matching, then join with space (implicit AND).
+        return string.Join(" ", tokens.Select(t => $"\"{t}\"*"));
+    }
+
+    [GeneratedRegex(@"[^\w\s]", RegexOptions.Compiled)]
+    private static partial Regex FtsSpecialCharsRegex();
 
     private static ClipboardItem MapRow(SqliteDataReader reader)
     {

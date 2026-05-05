@@ -58,6 +58,17 @@ public partial class MainWindow : Window
         {
             ToggleMode();
             e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.P && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            if (_viewModel.SelectedItem is not null)
+            {
+                _viewModel.TogglePinCommand.Execute(_viewModel.SelectedItem);
+            }
+
+            e.Handled = true;
         }
     }
 

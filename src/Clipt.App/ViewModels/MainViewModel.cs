@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows.Data;
 using Clipt.Core;
+using Clipt.Core.Models;
 using Clipt.Core.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -11,16 +12,25 @@ namespace Clipt.App.ViewModels;
 
 public sealed partial class MainViewModel : ObservableObject
 {
+    private const int SearchDebounceMs = 250;
+
     private readonly IHistoryService _historyService;
+    private readonly ISearchService _searchService;
     private readonly IClipboardMonitor _clipboardMonitor;
     private readonly ILogger<MainViewModel> _logger;
+    private CancellationTokenSource? _searchCts;
+
+    private bool _isDemoFallback;
+    private List<ClipboardItem> _demoItems = [];
 
     public MainViewModel(
         IHistoryService historyService,
+        ISearchService searchService,
         IClipboardMonitor clipboardMonitor,
         ILogger<MainViewModel> logger)
     {
         _historyService = historyService;
+        _searchService = searchService;
         _clipboardMonitor = clipboardMonitor;
         _logger = logger;
         _clipboardMonitor.ClipboardItemCaptured += OnClipboardItemCaptured;
@@ -28,7 +38,6 @@ public sealed partial class MainViewModel : ObservableObject
         ItemsView.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ClipboardItemViewModel.GroupName)));
         ItemsView.SortDescriptions.Add(new SortDescription(nameof(ClipboardItemViewModel.IsPinned), ListSortDirection.Descending));
         ItemsView.SortDescriptions.Add(new SortDescription(nameof(ClipboardItemViewModel.CreatedAt), ListSortDirection.Descending));
-        ItemsView.Filter = FilterItem;
     }
 
     public ObservableCollection<ClipboardItemViewModel> Items { get; } = [];
@@ -65,12 +74,14 @@ public sealed partial class MainViewModel : ObservableObject
         if (items.Count == 0)
         {
             _logger.LogInformation("Database is empty, using demo data for showroom experience.");
-            items = DesignTimeData.GetSampleItems();
+            var demoItems = DesignTimeData.GetSampleItems();
+            _demoItems = [.. demoItems];
+            _isDemoFallback = true;
+            PopulateItems(demoItems);
         }
-
-        foreach (var item in items)
+        else
         {
-            Items.Add(new ClipboardItemViewModel(item));
+            PopulateItems(items);
         }
 
         SelectedItem = Items.FirstOrDefault();
@@ -89,9 +100,44 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(IsClipboardView));
     }
 
+    [RelayCommand]
+    private async Task TogglePin(ClipboardItemViewModel? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        if (_isDemoFallback)
+        {
+            var idx = _demoItems.FindIndex(i => i.Id == item.Id);
+            if (idx >= 0)
+            {
+                _demoItems[idx] = _demoItems[idx] with { IsPinned = !_demoItems[idx].IsPinned };
+            }
+
+            var filtered = _searchService.Filter(_demoItems, SearchText);
+            PopulateItems(filtered);
+            SelectedItem = Items.FirstOrDefault(i => i.Id == item.Id);
+            return;
+        }
+
+        try
+        {
+            var newPinnedState = !item.IsPinned;
+            await _historyService.SetPinnedAsync(item.Id, newPinnedState, CancellationToken.None);
+            await RefreshItemsAsync();
+            SelectedItem = Items.FirstOrDefault(i => i.Id == item.Id);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Failed to toggle pin for item {Id}.", item.Id);
+        }
+    }
+
     partial void OnSearchTextChanged(string value)
     {
-        ItemsView.Refresh();
+        DebounceSearch(value);
     }
 
     partial void OnIsWorkModeChanged(bool value)
@@ -100,21 +146,75 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(TargetWidth));
     }
 
-    private bool FilterItem(object candidate)
+    private async void DebounceSearch(string query)
     {
-        if (candidate is not ClipboardItemViewModel item)
+        _searchCts?.Cancel();
+        _searchCts = new CancellationTokenSource();
+        var token = _searchCts.Token;
+
+        try
         {
-            return false;
+            await Task.Delay(SearchDebounceMs, token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
         }
 
-        if (string.IsNullOrWhiteSpace(SearchText))
+        if (token.IsCancellationRequested)
         {
-            return true;
+            return;
         }
 
-        return item.Title.Contains(SearchText, StringComparison.OrdinalIgnoreCase)
-            || item.PreviewText.Contains(SearchText, StringComparison.OrdinalIgnoreCase)
-            || item.Content.Contains(SearchText, StringComparison.OrdinalIgnoreCase);
+        if (_isDemoFallback)
+        {
+            var results = _searchService.Filter(_demoItems, query);
+            PopulateItems(results);
+            return;
+        }
+
+        try
+        {
+            var results = await _historyService.SearchAsync(query, token);
+            PopulateItems(results);
+        }
+        catch (OperationCanceledException)
+        {
+            // Search was superseded by a newer query.
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Search failed for query '{Query}'.", query);
+        }
+    }
+
+    private async Task RefreshItemsAsync()
+    {
+        if (_isDemoFallback)
+        {
+            var filtered = _searchService.Filter(_demoItems, SearchText);
+            PopulateItems(filtered);
+            return;
+        }
+
+        try
+        {
+            var results = await _historyService.SearchAsync(SearchText, CancellationToken.None);
+            PopulateItems(results);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Failed to refresh items.");
+        }
+    }
+
+    private void PopulateItems(IReadOnlyList<Clipt.Core.Models.ClipboardItem> results)
+    {
+        Items.Clear();
+        foreach (var model in results)
+        {
+            Items.Add(new ClipboardItemViewModel(model));
+        }
     }
 
     private async void OnClipboardItemCaptured(object? sender, Clipt.Core.Models.ClipboardItem item)
@@ -127,6 +227,14 @@ public sealed partial class MainViewModel : ObservableObject
         catch (Exception exception)
         {
             _logger.LogError(exception, "Failed to persist captured clipboard item {Id}.", item.Id);
+        }
+
+        if (_isDemoFallback)
+        {
+            _logger.LogInformation("Real clipboard item captured, exiting demo fallback mode.");
+            _isDemoFallback = false;
+            _demoItems.Clear();
+            Items.Clear();
         }
 
         var existing = Items.FirstOrDefault(candidate => candidate.Id == savedItem.Id);
