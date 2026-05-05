@@ -28,6 +28,14 @@ public sealed record AppSettings
 
     public bool RestorePreviousClipboardAfterPaste { get; init; } = false;
 
+    public IReadOnlyList<string> IgnoredAppNames { get; init; } = [];
+
+    public IReadOnlyList<string> IgnoredAppPaths { get; init; } = [];
+
+    public IReadOnlyList<string> IgnoredPatterns { get; init; } = [];
+
+    public bool HonorClipboardViewerIgnore { get; init; } = true;
+
     public AppSettings ClampOpacity()
     {
         if (Opacity >= 0.1 && Opacity <= 1.0)

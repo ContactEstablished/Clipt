@@ -42,6 +42,10 @@ public sealed class SettingsRepositoryTests : IAsyncDisposable
         settings.OpenHotkey.Should().Be("Ctrl+Shift+V");
         settings.AutoPasteOnEnter.Should().BeTrue();
         settings.RestorePreviousClipboardAfterPaste.Should().BeFalse();
+        settings.IgnoredAppNames.Should().BeEmpty();
+        settings.IgnoredAppPaths.Should().BeEmpty();
+        settings.IgnoredPatterns.Should().BeEmpty();
+        settings.HonorClipboardViewerIgnore.Should().BeTrue();
     }
 
     [Fact]
@@ -64,6 +68,10 @@ public sealed class SettingsRepositoryTests : IAsyncDisposable
             AccentColor = "#FF5722",
             AutoPasteOnEnter = false,
             RestorePreviousClipboardAfterPaste = true,
+            IgnoredAppNames = ["PasswordManager", "KeePass"],
+            IgnoredAppPaths = ["C:\\Program Files\\SecretApp"],
+            IgnoredPatterns = ["secret", "regex:\\d{3}-\\d{2}-\\d{4}"],
+            HonorClipboardViewerIgnore = false,
         };
 
         await _repository.SaveAsync(original, CancellationToken.None);
@@ -83,6 +91,10 @@ public sealed class SettingsRepositoryTests : IAsyncDisposable
         loaded.AccentColor.Should().Be("#FF5722");
         loaded.AutoPasteOnEnter.Should().BeFalse();
         loaded.RestorePreviousClipboardAfterPaste.Should().BeTrue();
+        loaded.IgnoredAppNames.Should().BeEquivalentTo(["PasswordManager", "KeePass"]);
+        loaded.IgnoredAppPaths.Should().BeEquivalentTo(["C:\\Program Files\\SecretApp"]);
+        loaded.IgnoredPatterns.Should().BeEquivalentTo(["secret", "regex:\\d{3}-\\d{2}-\\d{4}"]);
+        loaded.HonorClipboardViewerIgnore.Should().BeFalse();
     }
 
     [Fact]
@@ -229,6 +241,10 @@ public sealed class SettingsRepositoryTests : IAsyncDisposable
         loaded.Top.Should().BeNull();
         loaded.AutoPasteOnEnter.Should().BeTrue();
         loaded.RestorePreviousClipboardAfterPaste.Should().BeFalse();
+        loaded.IgnoredAppNames.Should().BeEmpty();
+        loaded.IgnoredAppPaths.Should().BeEmpty();
+        loaded.IgnoredPatterns.Should().BeEmpty();
+        loaded.HonorClipboardViewerIgnore.Should().BeTrue();
     }
 
     [Fact]

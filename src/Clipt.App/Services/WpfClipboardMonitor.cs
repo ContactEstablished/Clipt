@@ -9,26 +9,66 @@ using Microsoft.Extensions.Logging;
 
 namespace Clipt.App.Services;
 
-public sealed class WpfClipboardMonitor(
-    IContentTypeDetector contentTypeDetector,
-    IPrivacyFilter privacyFilter,
-    ILogger<WpfClipboardMonitor> logger) : IClipboardMonitor, IDisposable
+/// <summary>
+/// Monitors the system clipboard for text changes and emits
+/// <see cref="ClipboardItemCaptured"/> events. Uses Win32 clipboard
+/// format listener messages for reliable detection.
+///
+/// Source app metadata is resolved via <see cref="ISourceAppResolver"/>.
+/// Privacy settings are cached at startup from <see cref="ISettingsService"/>
+/// and passed to the <see cref="IPrivacyFilter"/> on each capture.
+/// </summary>
+public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
 {
+    private readonly IContentTypeDetector _contentTypeDetector;
+    private readonly IPrivacyFilter _privacyFilter;
+    private readonly ISourceAppResolver _sourceAppResolver;
+    private readonly ISettingsService _settingsService;
+    private readonly ILogger<WpfClipboardMonitor> _logger;
+
     private HwndSource? _messageSource;
     private string? _lastTextHash;
+    private AppSettings? _cachedSettings;
     private bool _isDisposed;
+
+    public WpfClipboardMonitor(
+        IContentTypeDetector contentTypeDetector,
+        IPrivacyFilter privacyFilter,
+        ISourceAppResolver sourceAppResolver,
+        ISettingsService settingsService,
+        ILogger<WpfClipboardMonitor> logger)
+    {
+        _contentTypeDetector = contentTypeDetector;
+        _privacyFilter = privacyFilter;
+        _sourceAppResolver = sourceAppResolver;
+        _settingsService = settingsService;
+        _logger = logger;
+    }
 
     public event EventHandler<ClipboardItem>? ClipboardItemCaptured;
 
     public bool IsCapturing { get; private set; }
 
-    public Task StartAsync(CancellationToken cancellationToken)
+    public async Task StartAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         if (IsCapturing)
         {
-            return Task.CompletedTask;
+            return;
+        }
+
+        // Cache privacy settings at startup. If loading fails, defaults are used
+        // so monitoring is never blocked by a settings read error.
+        try
+        {
+            _cachedSettings = await _settingsService.GetAsync(cancellationToken);
+            _logger.LogDebug("Privacy settings cached for clipboard monitor.");
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception, "Unable to load privacy settings; using permissive defaults.");
+            _cachedSettings = new AppSettings();
         }
 
         var parameters = new HwndSourceParameters("CliptClipboardListener")
@@ -44,16 +84,15 @@ public sealed class WpfClipboardMonitor(
         if (!NativeMethods.AddClipboardFormatListener(_messageSource.Handle))
         {
             var error = Marshal.GetLastWin32Error();
-            logger.LogWarning("Unable to register clipboard listener. Win32 error: {Error}", error);
+            _logger.LogWarning("Unable to register clipboard listener. Win32 error: {Error}", error);
             _messageSource.RemoveHook(WndProc);
             _messageSource.Dispose();
             _messageSource = null;
-            return Task.CompletedTask;
+            return;
         }
 
         IsCapturing = true;
-        logger.LogInformation("Clipboard listener registered.");
-        return Task.CompletedTask;
+        _logger.LogInformation("Clipboard listener registered.");
     }
 
     public Task StopAsync(CancellationToken cancellationToken)
@@ -108,8 +147,11 @@ public sealed class WpfClipboardMonitor(
             }
 
             var item = CreateTextItem(text);
-            if (!privacyFilter.ShouldCapture(item))
+            if (!_privacyFilter.ShouldCapture(item, _cachedSettings))
             {
+                _logger.LogDebug(
+                    "Clipboard item from '{SourceApp}' blocked by privacy filter.",
+                    item.SourceAppName);
                 return;
             }
 
@@ -118,23 +160,28 @@ public sealed class WpfClipboardMonitor(
         }
         catch (ExternalException exception)
         {
-            logger.LogDebug(exception, "Clipboard was temporarily unavailable.");
+            _logger.LogDebug(exception, "Clipboard was temporarily unavailable.");
         }
         catch (InvalidOperationException exception)
         {
-            logger.LogDebug(exception, "Clipboard text capture failed.");
+            _logger.LogDebug(exception, "Clipboard text capture failed.");
         }
     }
 
     private ClipboardItem CreateTextItem(string text)
     {
-        var contentType = contentTypeDetector.Detect(text);
+        var contentType = _contentTypeDetector.Detect(text);
         var title = CreateTitle(text, contentType);
         var preview = text.ReplaceLineEndings(" ");
         if (preview.Length > 180)
         {
             preview = string.Concat(preview.AsSpan(0, 177), "...");
         }
+
+        // Resolve the source application at capture time.
+        // The ForegroundWindowTracker may have captured the previous window
+        // before Clipt took focus; the resolver handles that internally.
+        var source = _sourceAppResolver.Resolve();
 
         var now = DateTimeOffset.Now;
 
@@ -146,7 +193,8 @@ public sealed class WpfClipboardMonitor(
             PreviewText = preview,
             Content = text,
             ContentType = contentType,
-            SourceAppName = "Clipboard",
+            SourceAppName = source.Name,
+            SourceAppPath = source.Path,
             CreatedAt = now,
             ByteSize = Encoding.UTF8.GetByteCount(text),
             LastUsedAt = now,
@@ -184,7 +232,7 @@ public sealed class WpfClipboardMonitor(
         if (IsCapturing && !NativeMethods.RemoveClipboardFormatListener(_messageSource.Handle))
         {
             var error = Marshal.GetLastWin32Error();
-            logger.LogDebug("Unable to unregister clipboard listener. Win32 error: {Error}", error);
+            _logger.LogDebug("Unable to unregister clipboard listener. Win32 error: {Error}", error);
         }
 
         _messageSource.RemoveHook(WndProc);
