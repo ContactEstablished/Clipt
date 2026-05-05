@@ -5,6 +5,8 @@ using Clipt.App.Services;
 using Clipt.App.ViewModels;
 using Clipt.App.Views;
 using Clipt.Core.Services;
+using Clipt.Data;
+using Clipt.Data.Migrations;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
@@ -26,6 +28,10 @@ public partial class App : Application
         try
         {
             _host = CreateHost();
+
+            var migrationRunner = _host.Services.GetRequiredService<MigrationRunner>();
+            await migrationRunner.RunAsync(CancellationToken.None);
+
             await _host.StartAsync();
 
             var mainWindow = _host.Services.GetRequiredService<MainWindow>();
@@ -72,7 +78,9 @@ public partial class App : Application
                 .WriteTo.File(logPath, rollingInterval: RollingInterval.Day, retainedFileCountLimit: 10);
         });
 
-        builder.Services.AddSingleton<IHistoryService, DemoHistoryService>();
+        builder.Services.AddSingleton<DatabasePathProvider>();
+        builder.Services.AddSingleton<MigrationRunner>();
+        builder.Services.AddSingleton<IHistoryService, ClipboardRepository>();
         builder.Services.AddSingleton<ISearchService, SearchService>();
         builder.Services.AddSingleton<IContentTypeDetector, ContentTypeDetector>();
         builder.Services.AddSingleton<IPrivacyFilter, PrivacyFilter>();

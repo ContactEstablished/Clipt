@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
 using System.Text;
 using System.Windows;
 using System.Windows.Interop;
@@ -102,7 +101,7 @@ public sealed class WpfClipboardMonitor(
                 return;
             }
 
-            var hash = ComputeHash(text);
+            var hash = ClipboardContentHasher.ComputeHash(text);
             if (hash == _lastTextHash)
             {
                 return;
@@ -137,16 +136,21 @@ public sealed class WpfClipboardMonitor(
             preview = string.Concat(preview.AsSpan(0, 177), "...");
         }
 
+        var now = DateTimeOffset.Now;
+
         return new ClipboardItem
         {
             Id = Guid.NewGuid(),
+            ContentHash = ClipboardContentHasher.ComputeHash(text),
             Title = title,
             PreviewText = preview,
             Content = text,
             ContentType = contentType,
             SourceAppName = "Clipboard",
-            CreatedAt = DateTimeOffset.Now,
+            CreatedAt = now,
             ByteSize = Encoding.UTF8.GetByteCount(text),
+            LastUsedAt = now,
+            UseCount = 0,
             Formats =
             [
                 new ClipboardFormat("CF_UNICODETEXT", text),
@@ -167,12 +171,6 @@ public sealed class WpfClipboardMonitor(
         }
 
         return firstLine.Length <= 64 ? firstLine : string.Concat(firstLine.AsSpan(0, 61), "...");
-    }
-
-    private static string ComputeHash(string text)
-    {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(text));
-        return Convert.ToHexString(bytes);
     }
 
     private void StopListener()

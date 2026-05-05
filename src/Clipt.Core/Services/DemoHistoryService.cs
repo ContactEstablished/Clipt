@@ -9,4 +9,10 @@ public sealed class DemoHistoryService : IHistoryService
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(DesignTimeData.GetSampleItems());
     }
+
+    public Task<ClipboardItem> SaveAsync(ClipboardItem item, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(item);
+    }
 }

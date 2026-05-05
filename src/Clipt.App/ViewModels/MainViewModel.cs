@@ -1,9 +1,11 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows.Data;
+using Clipt.Core;
 using Clipt.Core.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.Logging;
 
 namespace Clipt.App.ViewModels;
 
@@ -11,11 +13,16 @@ public sealed partial class MainViewModel : ObservableObject
 {
     private readonly IHistoryService _historyService;
     private readonly IClipboardMonitor _clipboardMonitor;
+    private readonly ILogger<MainViewModel> _logger;
 
-    public MainViewModel(IHistoryService historyService, IClipboardMonitor clipboardMonitor)
+    public MainViewModel(
+        IHistoryService historyService,
+        IClipboardMonitor clipboardMonitor,
+        ILogger<MainViewModel> logger)
     {
         _historyService = historyService;
         _clipboardMonitor = clipboardMonitor;
+        _logger = logger;
         _clipboardMonitor.ClipboardItemCaptured += OnClipboardItemCaptured;
         ItemsView = CollectionViewSource.GetDefaultView(Items);
         ItemsView.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ClipboardItemViewModel.GroupName)));
@@ -54,6 +61,13 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         var items = await _historyService.GetItemsAsync(cancellationToken);
+
+        if (items.Count == 0)
+        {
+            _logger.LogInformation("Database is empty, using demo data for showroom experience.");
+            items = DesignTimeData.GetSampleItems();
+        }
+
         foreach (var item in items)
         {
             Items.Add(new ClipboardItemViewModel(item));
@@ -103,9 +117,25 @@ public sealed partial class MainViewModel : ObservableObject
             || item.Content.Contains(SearchText, StringComparison.OrdinalIgnoreCase);
     }
 
-    private void OnClipboardItemCaptured(object? sender, Clipt.Core.Models.ClipboardItem item)
+    private async void OnClipboardItemCaptured(object? sender, Clipt.Core.Models.ClipboardItem item)
     {
-        var viewModel = new ClipboardItemViewModel(item);
+        var savedItem = item;
+        try
+        {
+            savedItem = await _historyService.SaveAsync(item, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Failed to persist captured clipboard item {Id}.", item.Id);
+        }
+
+        var existing = Items.FirstOrDefault(candidate => candidate.Id == savedItem.Id);
+        if (existing is not null)
+        {
+            Items.Remove(existing);
+        }
+
+        var viewModel = new ClipboardItemViewModel(savedItem);
         Items.Insert(0, viewModel);
         SelectedItem = viewModel;
     }

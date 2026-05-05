@@ -1,4 +1,5 @@
 using Clipt.Core.Models;
+using Clipt.Core.Services;
 
 namespace Clipt.Core;
 
@@ -142,6 +143,7 @@ public static class DesignTimeData
         return new ClipboardItem
         {
             Id = Guid.NewGuid(),
+            ContentHash = ClipboardContentHasher.ComputeHash(content),
             Title = title,
             PreviewText = preview,
             Content = content,
@@ -153,6 +155,8 @@ public static class DesignTimeData
             ImageUri = imageUri,
             FilePaths = filePaths ?? [],
             ByteSize = content.Length * sizeof(char),
+            LastUsedAt = createdAt,
+            UseCount = 0,
             Formats =
             [
                 new ClipboardFormat("CF_UNICODETEXT", content),

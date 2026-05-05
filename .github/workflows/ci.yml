@@ -29,7 +29,7 @@ jobs:
         run: dotnet build Clipt.sln --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test Clipt.sln --configuration Release --no-build --logger "trx;LogFileName=clipt-tests.trx" --results-directory TestResults
+        run: dotnet test Clipt.sln --configuration Release --no-build --logger "trx;LogFilePrefix=clipt-tests" --results-directory TestResults
 
       - name: Upload test results
         if: always()
