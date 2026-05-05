@@ -106,15 +106,16 @@ public partial class MainWindow : Window
 
         if (e.Key == Key.Enter)
         {
-            // Skip paste when a modifier combination is clearly not intended
-            // (e.g. Alt+Enter, Win+Enter).
-            if (Keyboard.Modifiers is ModifierKeys.Alt or ModifierKeys.Windows)
+            // Any Alt or Windows modifier suppresses paste (Alt+Enter,
+            // Ctrl+Alt+Enter, Win+Shift+Enter, etc.).
+            var modifiers = Keyboard.Modifiers;
+            if ((modifiers & (ModifierKeys.Alt | ModifierKeys.Windows)) != 0)
             {
                 return;
             }
 
             e.Handled = true;
-            _ = PasteSelectedAndHideAsync(Keyboard.Modifiers);
+            _ = PasteSelectedAndHideAsync(modifiers);
         }
     }
 
@@ -321,6 +322,8 @@ public partial class MainWindow : Window
 
             await _clipboardWriter.WriteAsync(selected.Model, options, CancellationToken.None);
 
+            // Auto-paste via SendInput (best-effort; failure is non-fatal because
+            // the item is already on the clipboard for manual paste).
             var autoPaste = _pendingSave.AutoPasteOnEnter;
             var targetHwnd = _foregroundTracker.PreviousForegroundWindow;
 
@@ -341,13 +344,13 @@ public partial class MainWindow : Window
                 _logger.LogDebug(
                     "No previous foreground window captured; item is on clipboard, user can paste manually.");
             }
+
+            await SaveAndHideAsync();
         }
         catch (Exception exception)
         {
-            _logger.LogError(exception, "Paste operation failed for item {Id}.", selected.Id);
+            _logger.LogError(exception, "Paste operation failed for item {Id}. Keeping Clipt open.", selected.Id);
         }
-
-        await SaveAndHideAsync();
     }
 
     private async Task SaveAndHideAsync()
