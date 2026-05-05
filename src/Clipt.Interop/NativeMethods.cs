@@ -22,4 +22,7 @@ public static class NativeMethods
         int dwAttribute,
         ref int pvAttribute,
         int cbAttribute);
+
+    [DllImport("user32.dll")]
+    public static extern nint GetForegroundWindow();
 }

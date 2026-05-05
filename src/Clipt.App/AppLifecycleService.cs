@@ -1,19 +1,31 @@
+using Clipt.App.Services;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Clipt.App;
 
-public sealed class AppLifecycleService(ILogger<AppLifecycleService> logger) : IHostedService
+public sealed class AppLifecycleService : IHostedService
 {
-    public Task StartAsync(CancellationToken cancellationToken)
+    private readonly IHotkeyService _hotkeyService;
+    private readonly ILogger<AppLifecycleService> _logger;
+
+    public AppLifecycleService(IHotkeyService hotkeyService, ILogger<AppLifecycleService> logger)
     {
-        logger.LogInformation("Clipt Phase 1 shell starting.");
-        return Task.CompletedTask;
+        _hotkeyService = hotkeyService;
+        _logger = logger;
+    }
+
+    public async Task StartAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Clipt starting.");
+
+        await _hotkeyService.RegisterFromSettingsAsync(cancellationToken);
     }
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
-        logger.LogInformation("Clipt Phase 1 shell stopping.");
+        _logger.LogInformation("Clipt stopping.");
+        _hotkeyService.Unregister();
         return Task.CompletedTask;
     }
 }

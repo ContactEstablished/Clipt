@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media.Animation;
+using Clipt.App.Services;
 using Clipt.App.ViewModels;
 using Clipt.Core.Models;
 using Clipt.Core.Services;
@@ -22,16 +23,25 @@ public partial class MainWindow : Window
     private readonly ILogger<MainWindow> _logger;
     private readonly MainViewModel _viewModel;
     private readonly ISettingsService _settingsService;
+    private readonly IHotkeyService _hotkeyService;
+    private readonly ForegroundWindowTracker _foregroundTracker;
     private bool _isQuitting;
     private bool _isInitialized;
 
     private DateTime _lastSaveTime = DateTime.MinValue;
     private AppSettings _pendingSave = new();
 
-    public MainWindow(MainViewModel viewModel, ISettingsService settingsService, ILogger<MainWindow> logger)
+    public MainWindow(
+        MainViewModel viewModel,
+        ISettingsService settingsService,
+        IHotkeyService hotkeyService,
+        ForegroundWindowTracker foregroundTracker,
+        ILogger<MainWindow> logger)
     {
         _viewModel = viewModel;
         _settingsService = settingsService;
+        _hotkeyService = hotkeyService;
+        _foregroundTracker = foregroundTracker;
         _logger = logger;
         ShowFromTrayCommand = new RelayCommand(ShowFromTray);
 
@@ -40,6 +50,8 @@ public partial class MainWindow : Window
 
         SizeChanged += OnWindowSizeChanged;
         LocationChanged += OnWindowLocationChanged;
+
+        _hotkeyService.HotkeyPressed += OnHotkeyPressed;
     }
 
     public ICommand ShowFromTrayCommand { get; }
@@ -215,11 +227,59 @@ public partial class MainWindow : Window
         BeginAnimation(WidthProperty, animation, HandoffBehavior.SnapshotAndReplace);
     }
 
+    private void OnHotkeyPressed(object? sender, EventArgs e)
+    {
+        // Must dispatch to the UI thread because the hotkey fires on a
+        // background thread.
+        Dispatcher.Invoke(() =>
+        {
+            if (_isQuitting)
+            {
+                return;
+            }
+
+            if (IsVisible && IsActive)
+            {
+                _ = SaveAndHideAsync();
+            }
+            else
+            {
+                ShowFromHotkey();
+            }
+        });
+    }
+
     private void ShowFromTray()
     {
+        _foregroundTracker.Capture();
+        ShowFromHotkey();
+    }
+
+    private void ShowFromHotkey()
+    {
+        if (WindowState == WindowState.Minimized)
+        {
+            WindowState = WindowState.Normal;
+        }
+
         Show();
-        WindowState = WindowState.Normal;
         Activate();
+        FocusSearchBox();
+
+        // Discard the captured HWND when it is zero or Clipt's own handle
+        // so that future auto-paste only sees a genuine target window.
+        var myHwnd = new WindowInteropHelper(this).Handle;
+        if (_foregroundTracker.PreviousForegroundWindow == myHwnd
+            || _foregroundTracker.PreviousForegroundWindow == 0)
+        {
+            _foregroundTracker.Clear();
+        }
+    }
+
+    private void FocusSearchBox()
+    {
+        SearchBox.Focus();
+        SearchBox.SelectAll();
     }
 
     private async Task SaveAndHideAsync()
