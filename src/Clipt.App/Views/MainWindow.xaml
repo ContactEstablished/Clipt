@@ -6,6 +6,7 @@
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         xmlns:tb="clr-namespace:H.NotifyIcon;assembly=H.NotifyIcon.Wpf"
         xmlns:views="clr-namespace:Clipt.App.Views"
+        xmlns:controls="clr-namespace:Clipt.App.Controls"
         Title="Clipt"
         Width="380"
         Height="640"
@@ -158,6 +159,11 @@
                                     Margin="0,0,10,0"
                                     VerticalAlignment="Center"
                                     Orientation="Horizontal">
+                            <controls:TransparencySlider x:Name="TransparencyBar"
+                                                         Width="80"
+                                                         Margin="0,0,8,0"
+                                                         ToolTip="Window opacity"
+                                                         ValueChanged="OnOpacityValueChanged" />
                             <Button Click="OnToggleModeClick"
                                     Style="{StaticResource IconButtonStyle}"
                                     ToolTip="Toggle capture/work mode">

@@ -1,11 +1,12 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media.Animation;
 using Clipt.App.ViewModels;
+using Clipt.Core.Models;
+using Clipt.Core.Services;
 using Clipt.Interop;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -14,29 +15,42 @@ namespace Clipt.App.Views;
 
 public partial class MainWindow : Window
 {
-    private const double CaptureModeWidth = 380;
-    private const double WorkModeWidth = 880;
     private const int DwmBackdropMica = 2;
     private const int DwmCornerPreferenceRound = 2;
+    private const int SaveDebounceMs = 500;
+
     private readonly ILogger<MainWindow> _logger;
     private readonly MainViewModel _viewModel;
+    private readonly ISettingsService _settingsService;
     private bool _isQuitting;
+    private bool _isInitialized;
 
-    public MainWindow(MainViewModel viewModel, ILogger<MainWindow> logger)
+    private DateTime _lastSaveTime = DateTime.MinValue;
+    private AppSettings _pendingSave = new();
+
+    public MainWindow(MainViewModel viewModel, ISettingsService settingsService, ILogger<MainWindow> logger)
     {
         _viewModel = viewModel;
+        _settingsService = settingsService;
         _logger = logger;
         ShowFromTrayCommand = new RelayCommand(ShowFromTray);
 
         InitializeComponent();
         DataContext = _viewModel;
-        UpdateModeLayout(animate: false);
+
+        SizeChanged += OnWindowSizeChanged;
+        LocationChanged += OnWindowLocationChanged;
     }
 
     public ICommand ShowFromTrayCommand { get; }
 
     private async void OnWindowLoaded(object sender, RoutedEventArgs e)
     {
+        await LoadAndApplySettingsAsync();
+
+        _isInitialized = true;
+        UpdateModeLayout(animate: false);
+
         await _viewModel.InitializeAsync(CancellationToken.None);
     }
 
@@ -45,12 +59,12 @@ public partial class MainWindow : Window
         ApplyWindowsBackdrop();
     }
 
-    private void OnWindowKeyDown(object sender, KeyEventArgs e)
+    private async void OnWindowKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Escape)
         {
-            Hide();
             e.Handled = true;
+            await SaveAndHideAsync();
             return;
         }
 
@@ -90,21 +104,52 @@ public partial class MainWindow : Window
         WindowState = WindowState.Minimized;
     }
 
-    private void OnCloseClick(object sender, RoutedEventArgs e)
+    private async void OnCloseClick(object sender, RoutedEventArgs e)
     {
-        Hide();
+        await SaveAndHideAsync();
     }
 
-    private void OnWindowClosing(object? sender, CancelEventArgs e)
+    private async void OnWindowClosing(object? sender, CancelEventArgs e)
     {
         if (_isQuitting)
         {
-            TrayIcon.Dispose();
+            // Quit path: settings already saved and tray disposed by OnQuitTrayClick.
             return;
         }
 
         e.Cancel = true;
-        Hide();
+        await SaveAndHideAsync();
+    }
+
+    private void OnOpacityValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (!_isInitialized)
+        {
+            return;
+        }
+
+        Opacity = e.NewValue;
+        DebounceSave();
+    }
+
+    private void OnWindowSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (!_isInitialized || WindowState != WindowState.Normal)
+        {
+            return;
+        }
+
+        DebounceSave();
+    }
+
+    private void OnWindowLocationChanged(object? sender, EventArgs e)
+    {
+        if (!_isInitialized || WindowState != WindowState.Normal)
+        {
+            return;
+        }
+
+        DebounceSave();
     }
 
     private void OnOpenTrayClick(object sender, RoutedEventArgs e)
@@ -127,23 +172,31 @@ public partial class MainWindow : Window
             MessageBoxImage.Information);
     }
 
-    private void OnQuitTrayClick(object sender, RoutedEventArgs e)
+    private async void OnQuitTrayClick(object sender, RoutedEventArgs e)
     {
         _isQuitting = true;
+        await SaveCurrentSettingsAsync();
+        TrayIcon.Dispose();
         Close();
         Application.Current.Shutdown();
     }
 
-    private void ToggleMode()
+    private async void ToggleMode()
     {
         _viewModel.ToggleModeCommand.Execute(null);
         UpdateModeLayout(animate: true);
+        await SaveModeOnlyAsync();
     }
 
     private void UpdateModeLayout(bool animate)
     {
-        var targetWidth = _viewModel.IsWorkMode ? WorkModeWidth : CaptureModeWidth;
-        PreviewColumn.Width = _viewModel.IsWorkMode ? new GridLength(1.35, GridUnitType.Star) : new GridLength(0);
+        var targetWidth = _viewModel.IsWorkMode
+            ? _pendingSave.WorkModeWidth
+            : _pendingSave.CaptureModeWidth;
+
+        PreviewColumn.Width = _viewModel.IsWorkMode
+            ? new GridLength(1.35, GridUnitType.Star)
+            : new GridLength(0);
         PreviewColumn.MinWidth = _viewModel.IsWorkMode ? 430 : 0;
 
         if (!animate)
@@ -167,6 +220,121 @@ public partial class MainWindow : Window
         Show();
         WindowState = WindowState.Normal;
         Activate();
+    }
+
+    private async Task SaveAndHideAsync()
+    {
+        await SaveCurrentSettingsAsync();
+        Hide();
+    }
+
+    private async Task LoadAndApplySettingsAsync()
+    {
+        try
+        {
+            var settings = await _settingsService.GetAsync(CancellationToken.None);
+            _pendingSave = settings;
+
+            _viewModel.IsWorkMode = settings.IsWorkMode;
+            Width = settings.IsWorkMode ? settings.WorkModeWidth : settings.CaptureModeWidth;
+            Height = settings.Height;
+            Topmost = settings.AlwaysOnTop;
+            Opacity = settings.Normalize().Opacity;
+            TransparencyBar.Value = Opacity;
+
+            if (settings.Left.HasValue && settings.Top.HasValue)
+            {
+                if (IsPositionOnScreen(settings.Left.Value, settings.Top.Value, Width, Height))
+                {
+                    Left = settings.Left.Value;
+                    Top = settings.Top.Value;
+                }
+                else
+                {
+                    _logger.LogDebug(
+                        "Saved window position ({Left}, {Top}) is off-screen, using default position.",
+                        settings.Left, settings.Top);
+                }
+            }
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception, "Failed to load settings, using defaults.");
+        }
+    }
+
+    private async Task SaveCurrentSettingsAsync()
+    {
+        try
+        {
+            var isValid = WindowState == WindowState.Normal && IsLoaded;
+            var left = isValid ? (int?)Math.Round(Left) : _pendingSave.Left;
+            var top = isValid ? (int?)Math.Round(Top) : _pendingSave.Top;
+            var width = isValid ? (int)Math.Round(ActualWidth) : (int)Width;
+            var height = isValid ? (int)Math.Round(ActualHeight) : (int)Height;
+
+            var settings = new AppSettings
+            {
+                IsWorkMode = _viewModel.IsWorkMode,
+                Opacity = Opacity,
+                CaptureModeWidth = _viewModel.IsWorkMode ? _pendingSave.CaptureModeWidth : width,
+                WorkModeWidth = _viewModel.IsWorkMode ? width : _pendingSave.WorkModeWidth,
+                Height = height,
+                Left = left,
+                Top = top,
+                AlwaysOnTop = Topmost,
+                OpenHotkey = _pendingSave.OpenHotkey,
+                Theme = _pendingSave.Theme,
+                AccentColor = _pendingSave.AccentColor,
+            };
+
+            _pendingSave = settings;
+            await _settingsService.SaveAsync(settings, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception, "Failed to save settings.");
+        }
+    }
+
+    private async Task SaveModeOnlyAsync()
+    {
+        try
+        {
+            _pendingSave = _pendingSave with { IsWorkMode = _viewModel.IsWorkMode };
+            await _settingsService.SaveAsync(_pendingSave, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception, "Failed to save mode setting.");
+        }
+    }
+
+    private async void DebounceSave()
+    {
+        var now = DateTime.UtcNow;
+        _lastSaveTime = now;
+
+        await Task.Delay(SaveDebounceMs);
+
+        if (_lastSaveTime == now)
+        {
+            await SaveCurrentSettingsAsync();
+        }
+    }
+
+    private static bool IsPositionOnScreen(double left, double top, double width, double height)
+    {
+        var centerX = left + width / 2;
+        var centerY = top + height / 2;
+
+        var virtualLeft = SystemParameters.VirtualScreenLeft;
+        var virtualTop = SystemParameters.VirtualScreenTop;
+        var virtualRight = virtualLeft + SystemParameters.VirtualScreenWidth;
+        var virtualBottom = virtualTop + SystemParameters.VirtualScreenHeight;
+
+        return centerX >= virtualLeft && centerX <= virtualRight
+            && centerY >= virtualTop && centerY <= virtualBottom;
     }
 
     private void ApplyWindowsBackdrop()

@@ -81,6 +81,7 @@ public partial class App : Application
         builder.Services.AddSingleton<DatabasePathProvider>();
         builder.Services.AddSingleton<MigrationRunner>();
         builder.Services.AddSingleton<IHistoryService, ClipboardRepository>();
+        builder.Services.AddSingleton<ISettingsService, SettingsRepository>();
         builder.Services.AddSingleton<ISearchService, SearchService>();
         builder.Services.AddSingleton<IContentTypeDetector, ContentTypeDetector>();
         builder.Services.AddSingleton<IPrivacyFilter, PrivacyFilter>();

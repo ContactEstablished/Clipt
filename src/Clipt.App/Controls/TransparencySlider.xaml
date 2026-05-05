@@ -1,8 +1,9 @@
 <UserControl x:Class="Clipt.App.Controls.TransparencySlider"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Slider Minimum="0.1"
+    <Slider x:Name="InternalSlider"
+            Minimum="0.1"
             Maximum="1"
-            Value="1"
-            TickFrequency="0.1" />
+            Value="{Binding Value, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
+            TickFrequency="0.05" />
 </UserControl>
