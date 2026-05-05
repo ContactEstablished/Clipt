@@ -87,6 +87,8 @@ public partial class App : Application
         builder.Services.AddSingleton<IPrivacyFilter, PrivacyFilter>();
         builder.Services.AddSingleton<IClipboardMonitor, WpfClipboardMonitor>();
         builder.Services.AddSingleton<ForegroundWindowTracker>();
+        builder.Services.AddSingleton<IClipboardWriter, WpfClipboardWriter>();
+        builder.Services.AddSingleton<IInputSimulator, SendInputPasteService>();
         builder.Services.AddSingleton<IHotkeyService, GlobalHotkeyService>();
         builder.Services.AddHostedService<AppLifecycleService>();
         builder.Services.AddHostedService<ClipboardMonitorHostedService>();

@@ -4,5 +4,5 @@ namespace Clipt.Core.Services;
 
 public interface IClipboardWriter
 {
-    Task CopyAsync(ClipboardItem item, CancellationToken cancellationToken);
+    Task WriteAsync(ClipboardItem item, ClipboardWriteOptions options, CancellationToken cancellationToken);
 }

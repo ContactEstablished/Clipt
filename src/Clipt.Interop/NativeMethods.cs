@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 
 namespace Clipt.Interop;
 
-public static class NativeMethods
+public static partial class NativeMethods
 {
     public const int WmClipboardUpdate = 0x031D;
     public const int DwmwaWindowCornerPreference = 33;
@@ -22,7 +22,4 @@ public static class NativeMethods
         int dwAttribute,
         ref int pvAttribute,
         int cbAttribute);
-
-    [DllImport("user32.dll")]
-    public static extern nint GetForegroundWindow();
 }

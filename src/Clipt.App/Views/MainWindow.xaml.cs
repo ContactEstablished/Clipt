@@ -25,6 +25,8 @@ public partial class MainWindow : Window
     private readonly ISettingsService _settingsService;
     private readonly IHotkeyService _hotkeyService;
     private readonly ForegroundWindowTracker _foregroundTracker;
+    private readonly IClipboardWriter _clipboardWriter;
+    private readonly IInputSimulator _inputSimulator;
     private bool _isQuitting;
     private bool _isInitialized;
 
@@ -36,12 +38,16 @@ public partial class MainWindow : Window
         ISettingsService settingsService,
         IHotkeyService hotkeyService,
         ForegroundWindowTracker foregroundTracker,
+        IClipboardWriter clipboardWriter,
+        IInputSimulator inputSimulator,
         ILogger<MainWindow> logger)
     {
         _viewModel = viewModel;
         _settingsService = settingsService;
         _hotkeyService = hotkeyService;
         _foregroundTracker = foregroundTracker;
+        _clipboardWriter = clipboardWriter;
+        _inputSimulator = inputSimulator;
         _logger = logger;
         ShowFromTrayCommand = new RelayCommand(ShowFromTray);
 
@@ -95,6 +101,20 @@ public partial class MainWindow : Window
             }
 
             e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Enter)
+        {
+            // Skip paste when a modifier combination is clearly not intended
+            // (e.g. Alt+Enter, Win+Enter).
+            if (Keyboard.Modifiers is ModifierKeys.Alt or ModifierKeys.Windows)
+            {
+                return;
+            }
+
+            e.Handled = true;
+            _ = PasteSelectedAndHideAsync(Keyboard.Modifiers);
         }
     }
 
@@ -282,6 +302,54 @@ public partial class MainWindow : Window
         SearchBox.SelectAll();
     }
 
+    private async Task PasteSelectedAndHideAsync(ModifierKeys modifiers)
+    {
+        var selected = _viewModel.SelectedItem;
+        if (selected is null)
+        {
+            _logger.LogDebug("Enter pressed with no selected item; nothing to paste.");
+            return;
+        }
+
+        try
+        {
+            // Shift+Enter = plain text. Ctrl+Enter is reserved for markdown/raw
+            // but currently behaves the same as Enter (auto mode).
+            var options = (modifiers & ModifierKeys.Shift) != 0
+                ? ClipboardWriteOptions.PlainText
+                : ClipboardWriteOptions.Default;
+
+            await _clipboardWriter.WriteAsync(selected.Model, options, CancellationToken.None);
+
+            var autoPaste = _pendingSave.AutoPasteOnEnter;
+            var targetHwnd = _foregroundTracker.PreviousForegroundWindow;
+
+            if (autoPaste && targetHwnd != 0)
+            {
+                var myHwnd = new WindowInteropHelper(this).Handle;
+                if (targetHwnd != myHwnd)
+                {
+                    await _inputSimulator.SendPasteAsync(targetHwnd, CancellationToken.None);
+                }
+                else
+                {
+                    _logger.LogDebug("Target window is Clipt itself; pasting to clipboard only.");
+                }
+            }
+            else if (autoPaste && targetHwnd == 0)
+            {
+                _logger.LogDebug(
+                    "No previous foreground window captured; item is on clipboard, user can paste manually.");
+            }
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Paste operation failed for item {Id}.", selected.Id);
+        }
+
+        await SaveAndHideAsync();
+    }
+
     private async Task SaveAndHideAsync()
     {
         await SaveCurrentSettingsAsync();
@@ -346,6 +414,8 @@ public partial class MainWindow : Window
                 OpenHotkey = _pendingSave.OpenHotkey,
                 Theme = _pendingSave.Theme,
                 AccentColor = _pendingSave.AccentColor,
+                AutoPasteOnEnter = _pendingSave.AutoPasteOnEnter,
+                RestorePreviousClipboardAfterPaste = _pendingSave.RestorePreviousClipboardAfterPaste,
             };
 
             _pendingSave = settings;

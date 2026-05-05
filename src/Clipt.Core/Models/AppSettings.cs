@@ -24,6 +24,10 @@ public sealed record AppSettings
 
     public string AccentColor { get; init; } = "#14B8A6";
 
+    public bool AutoPasteOnEnter { get; init; } = true;
+
+    public bool RestorePreviousClipboardAfterPaste { get; init; } = false;
+
     public AppSettings ClampOpacity()
     {
         if (Opacity >= 0.1 && Opacity <= 1.0)

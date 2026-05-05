@@ -40,6 +40,8 @@ public sealed class SettingsRepositoryTests : IAsyncDisposable
         settings.Top.Should().BeNull();
         settings.AlwaysOnTop.Should().BeFalse();
         settings.OpenHotkey.Should().Be("Ctrl+Shift+V");
+        settings.AutoPasteOnEnter.Should().BeTrue();
+        settings.RestorePreviousClipboardAfterPaste.Should().BeFalse();
     }
 
     [Fact]
@@ -60,6 +62,8 @@ public sealed class SettingsRepositoryTests : IAsyncDisposable
             OpenHotkey = "Ctrl+Alt+V",
             Theme = "Light",
             AccentColor = "#FF5722",
+            AutoPasteOnEnter = false,
+            RestorePreviousClipboardAfterPaste = true,
         };
 
         await _repository.SaveAsync(original, CancellationToken.None);
@@ -77,6 +81,8 @@ public sealed class SettingsRepositoryTests : IAsyncDisposable
         loaded.OpenHotkey.Should().Be("Ctrl+Alt+V");
         loaded.Theme.Should().Be("Light");
         loaded.AccentColor.Should().Be("#FF5722");
+        loaded.AutoPasteOnEnter.Should().BeFalse();
+        loaded.RestorePreviousClipboardAfterPaste.Should().BeTrue();
     }
 
     [Fact]
@@ -221,6 +227,8 @@ public sealed class SettingsRepositoryTests : IAsyncDisposable
         loaded.Height.Should().Be(640);
         loaded.Left.Should().BeNull();
         loaded.Top.Should().BeNull();
+        loaded.AutoPasteOnEnter.Should().BeTrue();
+        loaded.RestorePreviousClipboardAfterPaste.Should().BeFalse();
     }
 
     [Fact]
