@@ -8,7 +8,13 @@ public interface IClipboardMonitor
 
     bool IsCapturing { get; }
 
+    bool IsPaused { get; }
+
+    event EventHandler? CaptureStateChanged;
+
     Task StartAsync(CancellationToken cancellationToken);
 
     Task StopAsync(CancellationToken cancellationToken);
+
+    Task SetPausedAsync(bool paused, CancellationToken cancellationToken);
 }

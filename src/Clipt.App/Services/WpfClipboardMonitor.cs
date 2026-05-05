@@ -29,6 +29,7 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
     private HwndSource? _messageSource;
     private string? _lastTextHash;
     private AppSettings? _cachedSettings;
+    private bool _isPaused;
     private bool _isDisposed;
 
     public WpfClipboardMonitor(
@@ -48,6 +49,33 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
     public event EventHandler<ClipboardItem>? ClipboardItemCaptured;
 
     public bool IsCapturing { get; private set; }
+
+    public bool IsPaused => _isPaused;
+
+    public event EventHandler? CaptureStateChanged;
+
+    public Task SetPausedAsync(bool paused, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (_isPaused == paused)
+        {
+            return Task.CompletedTask;
+        }
+
+        _isPaused = paused;
+        _logger.LogInformation("Clipboard capture {State}.", paused ? "paused" : "resumed");
+
+        // Keep the cached settings consistent so that a subsequent
+        // settings save includes the correct capture pause flag.
+        if (_cachedSettings is not null)
+        {
+            _cachedSettings = _cachedSettings with { IsCapturePaused = paused };
+        }
+
+        CaptureStateChanged?.Invoke(this, EventArgs.Empty);
+        return Task.CompletedTask;
+    }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -69,6 +97,15 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
         {
             _logger.LogWarning(exception, "Unable to load privacy settings; using permissive defaults.");
             _cachedSettings = new AppSettings();
+        }
+
+        // Apply persisted capture pause state before any clipboard events
+        // are processed. This runs inside StartAsync so the listener is not
+        // registered yet, guaranteeing no capture races.
+        if (_cachedSettings.IsCapturePaused)
+        {
+            _isPaused = true;
+            _logger.LogInformation("Clipboard capture starts in paused mode (persisted setting).");
         }
 
         var parameters = new HwndSourceParameters("CliptClipboardListener")
@@ -127,6 +164,11 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
 
     private void CaptureCurrentTextClipboardItem()
     {
+        if (_isPaused)
+        {
+            return;
+        }
+
         try
         {
             if (!Clipboard.ContainsText())

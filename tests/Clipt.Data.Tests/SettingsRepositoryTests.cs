@@ -32,6 +32,7 @@ public sealed class SettingsRepositoryTests : IAsyncDisposable
 
         settings.Should().NotBeNull();
         settings.IsWorkMode.Should().BeFalse();
+        settings.IsCapturePaused.Should().BeFalse();
         settings.Opacity.Should().Be(1.0);
         settings.CaptureModeWidth.Should().Be(380);
         settings.WorkModeWidth.Should().Be(880);
@@ -56,6 +57,7 @@ public sealed class SettingsRepositoryTests : IAsyncDisposable
         var original = new AppSettings
         {
             IsWorkMode = true,
+            IsCapturePaused = true,
             Opacity = 0.75,
             CaptureModeWidth = 400,
             WorkModeWidth = 900,
@@ -79,6 +81,7 @@ public sealed class SettingsRepositoryTests : IAsyncDisposable
         var loaded = await _repository.GetAsync(CancellationToken.None);
 
         loaded.IsWorkMode.Should().BeTrue();
+        loaded.IsCapturePaused.Should().BeTrue();
         loaded.Opacity.Should().Be(0.75);
         loaded.CaptureModeWidth.Should().Be(400);
         loaded.WorkModeWidth.Should().Be(900);
@@ -233,6 +236,7 @@ public sealed class SettingsRepositoryTests : IAsyncDisposable
         var loaded = await _repository.GetAsync(CancellationToken.None);
 
         loaded.IsWorkMode.Should().BeFalse();
+        loaded.IsCapturePaused.Should().BeFalse();
         loaded.Opacity.Should().Be(1.0);
         loaded.CaptureModeWidth.Should().Be(380);
         loaded.WorkModeWidth.Should().Be(880);

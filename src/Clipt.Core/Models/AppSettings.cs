@@ -4,6 +4,8 @@ public sealed record AppSettings
 {
     public bool IsWorkMode { get; init; }
 
+    public bool IsCapturePaused { get; init; }
+
     public double Opacity { get; init; } = 1.0;
 
     public int CaptureModeWidth { get; init; } = 380;

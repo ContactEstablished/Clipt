@@ -23,6 +23,7 @@ public partial class MainWindow : Window
     private readonly ILogger<MainWindow> _logger;
     private readonly MainViewModel _viewModel;
     private readonly ISettingsService _settingsService;
+    private readonly IClipboardMonitor _clipboardMonitor;
     private readonly IHotkeyService _hotkeyService;
     private readonly ForegroundWindowTracker _foregroundTracker;
     private readonly IClipboardWriter _clipboardWriter;
@@ -36,6 +37,7 @@ public partial class MainWindow : Window
     public MainWindow(
         MainViewModel viewModel,
         ISettingsService settingsService,
+        IClipboardMonitor clipboardMonitor,
         IHotkeyService hotkeyService,
         ForegroundWindowTracker foregroundTracker,
         IClipboardWriter clipboardWriter,
@@ -44,6 +46,7 @@ public partial class MainWindow : Window
     {
         _viewModel = viewModel;
         _settingsService = settingsService;
+        _clipboardMonitor = clipboardMonitor;
         _hotkeyService = hotkeyService;
         _foregroundTracker = foregroundTracker;
         _clipboardWriter = clipboardWriter;
@@ -188,6 +191,15 @@ public partial class MainWindow : Window
     private void OnOpenTrayClick(object sender, RoutedEventArgs e)
     {
         ShowFromTray();
+    }
+
+    private async void OnPauseCaptureClick(object sender, RoutedEventArgs e)
+    {
+        var paused = !_clipboardMonitor.IsPaused;
+        await _clipboardMonitor.SetPausedAsync(paused, CancellationToken.None);
+        _pendingSave = _pendingSave with { IsCapturePaused = paused };
+        UpdateTrayPauseState(paused);
+        await SaveCurrentSettingsAsync();
     }
 
     private void OnSettingsTrayClick(object sender, RoutedEventArgs e)
@@ -373,6 +385,8 @@ public partial class MainWindow : Window
             Opacity = settings.Normalize().Opacity;
             TransparencyBar.Value = Opacity;
 
+            UpdateTrayPauseState(settings.IsCapturePaused);
+
             if (settings.Left.HasValue && settings.Top.HasValue)
             {
                 if (IsPositionOnScreen(settings.Left.Value, settings.Top.Value, Width, Height))
@@ -407,6 +421,7 @@ public partial class MainWindow : Window
             var settings = new AppSettings
             {
                 IsWorkMode = _viewModel.IsWorkMode,
+                IsCapturePaused = _pendingSave.IsCapturePaused,
                 Opacity = Opacity,
                 CaptureModeWidth = _viewModel.IsWorkMode ? _pendingSave.CaptureModeWidth : width,
                 WorkModeWidth = _viewModel.IsWorkMode ? width : _pendingSave.WorkModeWidth,
@@ -512,5 +527,12 @@ public partial class MainWindow : Window
         {
             _logger.LogDebug("DwmSetWindowAttribute({Attribute}) returned {Result}.", attribute, result);
         }
+    }
+
+    private void UpdateTrayPauseState(bool paused)
+    {
+        PauseMenuItem.IsChecked = paused;
+        PauseMenuItem.Header = paused ? "Resume capturing" : "Pause capturing";
+        TrayIcon.ToolTipText = paused ? "Clipt — Paused" : "Clipt — Capturing";
     }
 }
