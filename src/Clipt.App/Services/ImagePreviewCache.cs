@@ -58,4 +58,81 @@ public sealed class ImagePreviewCache
             return null;
         }
     }
+
+    /// <summary>
+    /// Deletes the cached preview file referenced by <paramref name="imageUri"/>.
+    /// Only files that live inside the preview cache directory are deleted; any URI
+    /// pointing elsewhere is silently skipped. Null, empty, or malformed URIs are ignored.
+    /// </summary>
+    public void TryDeletePreview(string? imageUri)
+    {
+        if (string.IsNullOrWhiteSpace(imageUri))
+        {
+            return;
+        }
+
+        try
+        {
+            var localPath = UriToLocalPath(imageUri);
+            if (localPath is null)
+            {
+                return;
+            }
+
+            if (!IsInsideCacheDirectory(localPath))
+            {
+                _logger.LogWarning(
+                    "Refusing to delete preview file outside cache directory: '{Path}'.", localPath);
+                return;
+            }
+
+            if (File.Exists(localPath))
+            {
+                File.Delete(localPath);
+                _logger.LogDebug("Deleted preview cache file '{Path}'.", localPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to delete preview cache file for URI '{Uri}'.", imageUri);
+        }
+    }
+
+    /// <summary>
+    /// Deletes cached preview files for a batch of image URIs.
+    /// Each URI is validated and silently skipped when null/empty/outside the cache directory.
+    /// </summary>
+    public void TryDeletePreviews(IEnumerable<string?> imageUris)
+    {
+        foreach (var uri in imageUris)
+        {
+            TryDeletePreview(uri);
+        }
+    }
+
+    private string? UriToLocalPath(string imageUri)
+    {
+        if (Uri.TryCreate(imageUri, UriKind.Absolute, out var uri) && uri.IsFile)
+        {
+            return uri.LocalPath;
+        }
+
+        // Accept bare rooted local paths as a fallback.
+        if (Path.IsPathRooted(imageUri))
+        {
+            return imageUri;
+        }
+
+        return null;
+    }
+
+    private bool IsInsideCacheDirectory(string localPath)
+    {
+        var fullPath = Path.GetFullPath(localPath);
+        var cacheDir = Path.GetFullPath(_cacheDirectory);
+
+        // Require the file to be a direct child of (or nested inside) the cache directory.
+        return fullPath.StartsWith(cacheDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+            || fullPath.StartsWith(cacheDir + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+    }
 }

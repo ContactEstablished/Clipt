@@ -426,8 +426,8 @@ public sealed class ClipboardRepositoryTests : IAsyncDisposable
         await _repository.SaveAsync(CreateTestItem("Unpinned B"), CancellationToken.None);
         await _repository.SaveAsync(CreateTestItem("Pinned B", isPinned: true), CancellationToken.None);
 
-        var rowsDeleted = await _repository.ClearUnpinnedAsync(CancellationToken.None);
-        rowsDeleted.Should().Be(2);
+        var result = await _repository.ClearUnpinnedAsync(CancellationToken.None);
+        result.Count.Should().Be(2);
 
         var items = await _repository.GetItemsAsync(CancellationToken.None);
         items.Should().HaveCount(2);
@@ -522,8 +522,9 @@ public sealed class ClipboardRepositoryTests : IAsyncDisposable
     {
         await _migrationRunner.RunAsync(CancellationToken.None);
 
-        var rowsDeleted = await _repository.ClearUnpinnedAsync(CancellationToken.None);
-        rowsDeleted.Should().Be(0);
+        var result = await _repository.ClearUnpinnedAsync(CancellationToken.None);
+        result.Count.Should().Be(0);
+        result.ImageUris.Should().BeEmpty();
     }
 
     // ── Format persistence ──────────────────────────────────────────
@@ -761,8 +762,8 @@ public sealed class ClipboardRepositoryTests : IAsyncDisposable
         await _repository.SaveAsync(CreateTestItem("Pinned 1", isPinned: true), CancellationToken.None);
         await _repository.SaveAsync(CreateTestItem("Pinned 2", isPinned: true), CancellationToken.None);
 
-        var rowsDeleted = await _repository.ClearUnpinnedAsync(CancellationToken.None);
-        rowsDeleted.Should().Be(0);
+        var result = await _repository.ClearUnpinnedAsync(CancellationToken.None);
+        result.Count.Should().Be(0);
 
         var items = await _repository.GetItemsAsync(CancellationToken.None);
         items.Should().HaveCount(2);
@@ -781,7 +782,7 @@ public sealed class ClipboardRepositoryTests : IAsyncDisposable
         }
 
         var deleted = await _repository.PruneUnpinnedAsync(maxItems: 3, CancellationToken.None);
-        deleted.Should().Be(7);
+        deleted.Count.Should().Be(7);
 
         var items = await _repository.GetItemsAsync(CancellationToken.None);
         items.Should().HaveCount(3);
@@ -799,7 +800,7 @@ public sealed class ClipboardRepositoryTests : IAsyncDisposable
         await _repository.SaveAsync(CreateTestItem("Unpinned 3"), CancellationToken.None);
 
         var deleted = await _repository.PruneUnpinnedAsync(maxItems: 2, CancellationToken.None);
-        deleted.Should().Be(1);
+        deleted.Count.Should().Be(1);
 
         var items = await _repository.GetItemsAsync(CancellationToken.None);
         // 1 pinned + 2 unpinned kept = 3 total
@@ -825,7 +826,7 @@ public sealed class ClipboardRepositoryTests : IAsyncDisposable
         }
 
         var deleted = await _repository.PruneUnpinnedAsync(maxItems: 3, CancellationToken.None);
-        deleted.Should().Be(2);
+        deleted.Count.Should().Be(2);
 
         var items = await _repository.GetItemsAsync(CancellationToken.None);
         items.Should().HaveCount(23);
@@ -850,7 +851,7 @@ public sealed class ClipboardRepositoryTests : IAsyncDisposable
         await _repository.SaveAsync(newest, CancellationToken.None);
 
         var deleted = await _repository.PruneUnpinnedAsync(maxItems: 1, CancellationToken.None);
-        deleted.Should().Be(2);
+        deleted.Count.Should().Be(2);
 
         var items = await _repository.GetItemsAsync(CancellationToken.None);
         items.Should().ContainSingle();
@@ -868,7 +869,7 @@ public sealed class ClipboardRepositoryTests : IAsyncDisposable
         }
 
         var deleted = await _repository.PruneUnpinnedAsync(maxItems: 2, CancellationToken.None);
-        deleted.Should().Be(3);
+        deleted.Count.Should().Be(3);
     }
 
     [Fact]
@@ -879,7 +880,7 @@ public sealed class ClipboardRepositoryTests : IAsyncDisposable
         await _repository.SaveAsync(CreateTestItem("Only item"), CancellationToken.None);
 
         var deleted = await _repository.PruneUnpinnedAsync(maxItems: 5, CancellationToken.None);
-        deleted.Should().Be(0);
+        deleted.Count.Should().Be(0);
 
         var items = await _repository.GetItemsAsync(CancellationToken.None);
         items.Should().ContainSingle();
@@ -896,7 +897,7 @@ public sealed class ClipboardRepositoryTests : IAsyncDisposable
         }
 
         var deleted = await _repository.PruneUnpinnedAsync(maxItems: 0, CancellationToken.None);
-        deleted.Should().Be(0);
+        deleted.Count.Should().Be(0);
 
         var items = await _repository.GetItemsAsync(CancellationToken.None);
         items.Should().HaveCount(10);
@@ -913,7 +914,7 @@ public sealed class ClipboardRepositoryTests : IAsyncDisposable
         }
 
         var deleted = await _repository.PruneUnpinnedAsync(maxItems: -1, CancellationToken.None);
-        deleted.Should().Be(0);
+        deleted.Count.Should().Be(0);
 
         var items = await _repository.GetItemsAsync(CancellationToken.None);
         items.Should().HaveCount(5);
@@ -972,7 +973,7 @@ public sealed class ClipboardRepositoryTests : IAsyncDisposable
         await _migrationRunner.RunAsync(CancellationToken.None);
 
         var deleted = await _repository.PruneUnpinnedAsync(maxItems: 100, CancellationToken.None);
-        deleted.Should().Be(0);
+        deleted.Count.Should().Be(0);
     }
 
     [Fact]
@@ -984,7 +985,7 @@ public sealed class ClipboardRepositoryTests : IAsyncDisposable
         await _repository.SaveAsync(CreateTestItem("Pinned B", isPinned: true), CancellationToken.None);
 
         var deleted = await _repository.PruneUnpinnedAsync(maxItems: 1, CancellationToken.None);
-        deleted.Should().Be(0);
+        deleted.Count.Should().Be(0);
 
         var items = await _repository.GetItemsAsync(CancellationToken.None);
         items.Should().HaveCount(2);
@@ -1022,6 +1023,255 @@ public sealed class ClipboardRepositoryTests : IAsyncDisposable
         var items = await _repository.GetItemsAsync(CancellationToken.None);
         items.Should().ContainSingle();
         items[0].ImageUri.Should().BeNull();
+    }
+
+    // ── Image URI cleanup ────────────────────────────────────────────
+
+    [Fact]
+    public async Task DeleteAsync_ImageItem_ReturnsImageUri_ViaCallerKnowsUri()
+    {
+        // The repository does not change its DeleteAsync return type; the ViewModel
+        // already holds the URI from the ClipboardItemViewModel. This test verifies
+        // that an image item's ImageUri round-trips through Save -> GetItems correctly
+        // so the caller can use it for cache cleanup.
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        const string uri = "file:///C:/cache/preview-cache/img_del001.png";
+        var item = CreateTestItem("Delete image") with
+        {
+            ContentType = ContentType.Image,
+            ImageUri = uri,
+        };
+
+        await _repository.SaveAsync(item, CancellationToken.None);
+
+        var before = await _repository.GetItemsAsync(CancellationToken.None);
+        before.Should().ContainSingle();
+        before[0].ImageUri.Should().Be(uri, "URI must survive the save/load round-trip");
+
+        await _repository.DeleteAsync(item.Id, CancellationToken.None);
+
+        var after = await _repository.GetItemsAsync(CancellationToken.None);
+        after.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ClearUnpinnedAsync_ReturnsImageUrisOfDeletedImageItems()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        const string unpinnedUri1 = "file:///C:/cache/preview-cache/img_clear001.png";
+        const string unpinnedUri2 = "file:///C:/cache/preview-cache/img_clear002.png";
+        const string pinnedUri = "file:///C:/cache/preview-cache/img_pinned.png";
+
+        var unpinned1 = CreateTestItem("Unpinned image 1") with
+        {
+            ContentType = ContentType.Image,
+            ImageUri = unpinnedUri1,
+        };
+        var unpinned2 = CreateTestItem("Unpinned image 2") with
+        {
+            ContentType = ContentType.Image,
+            ImageUri = unpinnedUri2,
+        };
+        var pinnedImg = CreateTestItem("Pinned image", isPinned: true) with
+        {
+            ContentType = ContentType.Image,
+            ImageUri = pinnedUri,
+        };
+        var textItem = CreateTestItem("Plain text, no URI");
+
+        await _repository.SaveAsync(unpinned1, CancellationToken.None);
+        await _repository.SaveAsync(unpinned2, CancellationToken.None);
+        await _repository.SaveAsync(pinnedImg, CancellationToken.None);
+        await _repository.SaveAsync(textItem, CancellationToken.None);
+
+        var result = await _repository.ClearUnpinnedAsync(CancellationToken.None);
+
+        result.Count.Should().Be(3, "two unpinned images + one plain text item were deleted");
+        result.ImageUris.Should().HaveCount(2, "only items with a non-null image_uri are included");
+        result.ImageUris.Should().Contain(unpinnedUri1);
+        result.ImageUris.Should().Contain(unpinnedUri2);
+        result.ImageUris.Should().NotContain(pinnedUri, "pinned image must not be cleared");
+
+        var remaining = await _repository.GetItemsAsync(CancellationToken.None);
+        remaining.Should().ContainSingle();
+        remaining[0].Id.Should().Be(pinnedImg.Id);
+        remaining[0].ImageUri.Should().Be(pinnedUri);
+    }
+
+    [Fact]
+    public async Task ClearUnpinnedAsync_NoImageItems_ReturnsEmptyImageUriList()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        await _repository.SaveAsync(CreateTestItem("Text A"), CancellationToken.None);
+        await _repository.SaveAsync(CreateTestItem("Text B"), CancellationToken.None);
+
+        var result = await _repository.ClearUnpinnedAsync(CancellationToken.None);
+
+        result.Count.Should().Be(2);
+        result.ImageUris.Should().BeEmpty("no image URIs among deleted text items");
+    }
+
+    [Fact]
+    public async Task PruneUnpinnedAsync_ReturnsImageUrisOfPrunedImageItems()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var baseTime = DateTimeOffset.UtcNow;
+
+        const string oldUri = "file:///C:/cache/preview-cache/img_prune_old.png";
+        const string newUri = "file:///C:/cache/preview-cache/img_prune_new.png";
+
+        var oldest = CreateTestItem("Oldest image") with
+        {
+            CreatedAt = baseTime.AddHours(-10),
+            ContentType = ContentType.Image,
+            ImageUri = oldUri,
+        };
+        var newest = CreateTestItem("Newest image") with
+        {
+            CreatedAt = baseTime,
+            ContentType = ContentType.Image,
+            ImageUri = newUri,
+        };
+
+        await _repository.SaveAsync(oldest, CancellationToken.None);
+        await _repository.SaveAsync(newest, CancellationToken.None);
+
+        var result = await _repository.PruneUnpinnedAsync(maxItems: 1, CancellationToken.None);
+
+        result.Count.Should().Be(1);
+        result.ImageUris.Should().ContainSingle().Which.Should().Be(oldUri,
+            "only the oldest item is pruned");
+        result.ImageUris.Should().NotContain(newUri, "newest item survives pruning");
+
+        var remaining = await _repository.GetItemsAsync(CancellationToken.None);
+        remaining.Should().ContainSingle();
+        remaining[0].ImageUri.Should().Be(newUri);
+    }
+
+    [Fact]
+    public async Task PruneUnpinnedAsync_PinnedImageItems_NeverIncludedInPrunedUris()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var baseTime = DateTimeOffset.UtcNow;
+        const string pinnedUri = "file:///C:/cache/preview-cache/img_pinned_safe.png";
+        const string prunedUri = "file:///C:/cache/preview-cache/img_unpinned_prune.png";
+        const string keptUri = "file:///C:/cache/preview-cache/img_unpinned_keep.png";
+
+        var pinned = CreateTestItem("Pinned image", isPinned: true) with
+        {
+            CreatedAt = baseTime.AddHours(-20),
+            ContentType = ContentType.Image,
+            ImageUri = pinnedUri,
+        };
+        var pruned = CreateTestItem("Pruned unpinned image") with
+        {
+            CreatedAt = baseTime.AddHours(-10),
+            ContentType = ContentType.Image,
+            ImageUri = prunedUri,
+        };
+        var kept = CreateTestItem("Kept unpinned image") with
+        {
+            CreatedAt = baseTime,
+            ContentType = ContentType.Image,
+            ImageUri = keptUri,
+        };
+
+        await _repository.SaveAsync(pinned, CancellationToken.None);
+        await _repository.SaveAsync(pruned, CancellationToken.None);
+        await _repository.SaveAsync(kept, CancellationToken.None);
+
+        var result = await _repository.PruneUnpinnedAsync(maxItems: 1, CancellationToken.None);
+
+        result.Count.Should().Be(1);
+        result.ImageUris.Should().ContainSingle().Which.Should().Be(prunedUri);
+        result.ImageUris.Should().NotContain(pinnedUri, "pinned images are never pruned");
+
+        var remaining = await _repository.GetItemsAsync(CancellationToken.None);
+        remaining.Should().HaveCount(2);
+        remaining.Should().Contain(i => i.Id == pinned.Id);
+        remaining.Should().Contain(i => i.Id == kept.Id);
+    }
+
+    [Fact]
+    public async Task PruneUnpinnedAsync_MixedItems_OnlyPrunedImageUrisReturned()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var baseTime = DateTimeOffset.UtcNow;
+
+        const string pruneUri = "file:///C:/cache/preview-cache/img_prune_mixed.png";
+
+        var oldImage = CreateTestItem("Old image item") with
+        {
+            CreatedAt = baseTime.AddHours(-5),
+            ContentType = ContentType.Image,
+            ImageUri = pruneUri,
+        };
+        var oldText = CreateTestItem("Old text item") with
+        {
+            CreatedAt = baseTime.AddHours(-4),
+        };
+        var newText = CreateTestItem("New text item") with
+        {
+            CreatedAt = baseTime,
+        };
+
+        await _repository.SaveAsync(oldImage, CancellationToken.None);
+        await _repository.SaveAsync(oldText, CancellationToken.None);
+        await _repository.SaveAsync(newText, CancellationToken.None);
+
+        // Keep 2 unpinned → prune 1 (the oldest).
+        var result = await _repository.PruneUnpinnedAsync(maxItems: 2, CancellationToken.None);
+
+        result.Count.Should().Be(1);
+        result.ImageUris.Should().ContainSingle().Which.Should().Be(pruneUri);
+
+        var remaining = await _repository.GetItemsAsync(CancellationToken.None);
+        remaining.Should().HaveCount(2);
+        remaining.Should().NotContain(i => i.Id == oldImage.Id);
+    }
+
+    [Fact]
+    public async Task PruneUnpinnedAsync_TextRowPrunedBeforeImage_DoesNotReturnSurvivingImageUri()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var baseTime = DateTimeOffset.UtcNow;
+        const string survivingImageUri = "file:///C:/cache/preview-cache/img_survives_text_prune.png";
+
+        var oldText = CreateTestItem("Old text item") with
+        {
+            CreatedAt = baseTime.AddHours(-5),
+        };
+        var middleImage = CreateTestItem("Middle image item") with
+        {
+            CreatedAt = baseTime.AddHours(-4),
+            ContentType = ContentType.Image,
+            ImageUri = survivingImageUri,
+        };
+        var newText = CreateTestItem("New text item") with
+        {
+            CreatedAt = baseTime,
+        };
+
+        await _repository.SaveAsync(oldText, CancellationToken.None);
+        await _repository.SaveAsync(middleImage, CancellationToken.None);
+        await _repository.SaveAsync(newText, CancellationToken.None);
+
+        // Keep 2 unpinned: the oldest text item is pruned, while the image survives.
+        var result = await _repository.PruneUnpinnedAsync(maxItems: 2, CancellationToken.None);
+
+        result.Count.Should().Be(1);
+        result.ImageUris.Should().BeEmpty("the pruned row did not have an image URI");
+
+        var remaining = await _repository.GetItemsAsync(CancellationToken.None);
+        remaining.Should().HaveCount(2);
+        remaining.Should().Contain(i => i.Id == middleImage.Id && i.ImageUri == survivingImageUri);
     }
 
     public async ValueTask DisposeAsync()

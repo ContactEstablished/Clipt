@@ -50,15 +50,15 @@ public sealed class DemoHistoryService : IHistoryService
         return Task.CompletedTask;
     }
 
-    public Task<int> ClearUnpinnedAsync(CancellationToken cancellationToken)
+    public Task<HistoryDeletionResult> ClearUnpinnedAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult(0);
+        return Task.FromResult(HistoryDeletionResult.Empty);
     }
 
-    public Task<int> PruneUnpinnedAsync(int maxItems, CancellationToken cancellationToken)
+    public Task<HistoryDeletionResult> PruneUnpinnedAsync(int maxItems, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult(0);
+        return Task.FromResult(HistoryDeletionResult.Empty);
     }
 }

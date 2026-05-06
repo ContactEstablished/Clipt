@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows.Data;
+using Clipt.App.Services;
 using Clipt.Core;
 using Clipt.Core.Models;
 using Clipt.Core.Services;
@@ -18,6 +19,7 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly ISearchService _searchService;
     private readonly IClipboardMonitor _clipboardMonitor;
     private readonly ISettingsService _settingsService;
+    private readonly ImagePreviewCache _imagePreviewCache;
     private readonly ILogger<MainViewModel> _logger;
     private CancellationTokenSource? _searchCts;
 
@@ -39,12 +41,14 @@ public sealed partial class MainViewModel : ObservableObject
         ISearchService searchService,
         IClipboardMonitor clipboardMonitor,
         ISettingsService settingsService,
+        ImagePreviewCache imagePreviewCache,
         ILogger<MainViewModel> logger)
     {
         _historyService = historyService;
         _searchService = searchService;
         _clipboardMonitor = clipboardMonitor;
         _settingsService = settingsService;
+        _imagePreviewCache = imagePreviewCache;
         _logger = logger;
         _clipboardMonitor.ClipboardItemCaptured += OnClipboardItemCaptured;
         ItemsView = CollectionViewSource.GetDefaultView(Items);
@@ -147,6 +151,7 @@ public sealed partial class MainViewModel : ObservableObject
             }
 
             await _historyService.DeleteAsync(item.Id, CancellationToken.None);
+            _imagePreviewCache.TryDeletePreview(item.ImageUri);
             _clipboardMonitor.ResetDuplicateTracking();
             await RefreshItemsAsync();
             SelectedItem = GetNextSelectionAfterDelete();
@@ -171,7 +176,8 @@ public sealed partial class MainViewModel : ObservableObject
                 return;
             }
 
-            await _historyService.ClearUnpinnedAsync(CancellationToken.None);
+            var clearResult = await _historyService.ClearUnpinnedAsync(CancellationToken.None);
+            _imagePreviewCache.TryDeletePreviews(clearResult.ImageUris);
             _clipboardMonitor.ResetDuplicateTracking();
             await RefreshItemsAsync();
             SelectedItem = Items.FirstOrDefault();
@@ -343,9 +349,10 @@ public sealed partial class MainViewModel : ObservableObject
         // history stays bounded even if previous prunes were skipped.
         try
         {
-            var pruned = await _historyService.PruneUnpinnedAsync(_cachedMaxHistoryItems, CancellationToken.None);
-            if (pruned > 0)
+            var pruneResult = await _historyService.PruneUnpinnedAsync(_cachedMaxHistoryItems, CancellationToken.None);
+            if (pruneResult.Count > 0)
             {
+                _imagePreviewCache.TryDeletePreviews(pruneResult.ImageUris);
                 // Items were removed — reload from the database to stay consistent.
                 await RefreshItemsAsync();
                 _clipboardMonitor.ResetDuplicateTracking();

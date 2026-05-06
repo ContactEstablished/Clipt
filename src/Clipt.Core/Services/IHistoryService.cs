@@ -14,13 +14,18 @@ public interface IHistoryService
 
     Task DeleteAsync(Guid id, CancellationToken cancellationToken);
 
-    Task<int> ClearUnpinnedAsync(CancellationToken cancellationToken);
+    /// <summary>
+    /// Deletes all unpinned items and returns the count and image preview URIs that were removed.
+    /// Callers are responsible for deleting any referenced preview cache files.
+    /// </summary>
+    Task<HistoryDeletionResult> ClearUnpinnedAsync(CancellationToken cancellationToken);
 
     /// <summary>
     /// Deletes the oldest unpinned items so that at most <paramref name="maxItems"/>
     /// unpinned rows remain. Pinned items are never deleted.
+    /// Returns the deleted row count and image preview URIs that were removed;
+    /// callers are responsible for deleting any referenced preview cache files.
     /// </summary>
     /// <param name="maxItems">Maximum number of unpinned items to keep. Values &lt;= 0 disable pruning.</param>
-    /// <returns>The number of deleted rows.</returns>
-    Task<int> PruneUnpinnedAsync(int maxItems, CancellationToken cancellationToken);
+    Task<HistoryDeletionResult> PruneUnpinnedAsync(int maxItems, CancellationToken cancellationToken);
 }

@@ -370,19 +370,33 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
         }
     }
 
-    public async Task<int> ClearUnpinnedAsync(CancellationToken cancellationToken)
+    public async Task<HistoryDeletionResult> ClearUnpinnedAsync(CancellationToken cancellationToken)
     {
         await _connectionLock.WaitAsync(cancellationToken);
         try
         {
             var connection = await GetConnectionAsync(cancellationToken);
 
+            // Collect image URIs of unpinned items before deleting so callers can clean up
+            // the preview cache without the repository touching the filesystem.
+            using var selectCommand = connection.CreateCommand();
+            selectCommand.CommandText =
+                "SELECT image_uri FROM clipboard_items WHERE is_pinned = 0 AND image_uri IS NOT NULL";
+            var imageUris = new List<string>();
+            await using (var reader = await selectCommand.ExecuteReaderAsync(cancellationToken))
+            {
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    imageUris.Add(reader.GetString(0));
+                }
+            }
+
             using var command = connection.CreateCommand();
             command.CommandText = "DELETE FROM clipboard_items WHERE is_pinned = 0";
             var rowsDeleted = await command.ExecuteNonQueryAsync(cancellationToken);
 
             _logger.LogDebug("Cleared {Count} unpinned clipboard items.", rowsDeleted);
-            return rowsDeleted;
+            return new HistoryDeletionResult(rowsDeleted, imageUris);
         }
         finally
         {
@@ -390,12 +404,12 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
         }
     }
 
-    public async Task<int> PruneUnpinnedAsync(int maxItems, CancellationToken cancellationToken)
+    public async Task<HistoryDeletionResult> PruneUnpinnedAsync(int maxItems, CancellationToken cancellationToken)
     {
         // Values <= 0 mean pruning is disabled.
         if (maxItems <= 0)
         {
-            return 0;
+            return HistoryDeletionResult.Empty;
         }
 
         await _connectionLock.WaitAsync(cancellationToken);
@@ -411,7 +425,30 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
             var excess = (int)unpinnedCount - maxItems;
             if (excess <= 0)
             {
-                return 0;
+                return HistoryDeletionResult.Empty;
+            }
+
+            // Collect image URIs for the exact items about to be pruned so callers
+            // can clean up the preview cache without the repository touching the filesystem.
+            using var selectCommand = connection.CreateCommand();
+            selectCommand.CommandText = """
+                SELECT image_uri FROM clipboard_items
+                WHERE image_uri IS NOT NULL
+                  AND id IN (
+                      SELECT id FROM clipboard_items
+                      WHERE is_pinned = 0
+                      ORDER BY created_at ASC
+                      LIMIT @excess
+                  )
+                """;
+            selectCommand.Parameters.AddWithValue("@excess", excess);
+            var imageUris = new List<string>();
+            await using (var reader = await selectCommand.ExecuteReaderAsync(cancellationToken))
+            {
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    imageUris.Add(reader.GetString(0));
+                }
             }
 
             // Delete oldest unpinned items first.
@@ -431,7 +468,7 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
             var rowsDeleted = await deleteCommand.ExecuteNonQueryAsync(cancellationToken);
 
             _logger.LogDebug("Pruned {Count} oldest unpinned items (max {MaxItems} unpinned).", rowsDeleted, maxItems);
-            return rowsDeleted;
+            return new HistoryDeletionResult(rowsDeleted, imageUris);
         }
         finally
         {
