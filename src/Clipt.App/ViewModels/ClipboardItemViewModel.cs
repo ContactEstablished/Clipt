@@ -1,5 +1,6 @@
 using System.Linq;
 using Clipt.Core.Models;
+using Clipt.Core.Services;
 
 namespace Clipt.App.ViewModels;
 
@@ -35,4 +36,11 @@ public sealed class ClipboardItemViewModel(ClipboardItem model)
         model.Formats.Select(f => new ClipboardFormatBadgeViewModel(f)).ToList();
 
     public bool HasAvailableFormats => AvailableFormats.Count > 0;
+
+    public IReadOnlyList<FilePathPreviewViewModel> FilePathPreviews { get; } =
+        model.FilePaths.Select(p => new FilePathPreviewViewModel(p)).ToList();
+
+    public bool HasFilePathPreviews => FilePathPreviews.Count > 0;
+
+    public string FilePathSummary => FilePathDisplayHelper.FormatCountSummary(Model.FilePaths);
 }

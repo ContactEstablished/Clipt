@@ -129,22 +129,80 @@
                     BorderThickness="1"
                     CornerRadius="8"
                     Padding="18"
-                    Visibility="{Binding ContentType, Converter={StaticResource ContentTypeVisibilityConverter}, ConverterParameter=File}">
-                <ItemsControl ItemsSource="{Binding FilePaths}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Border Margin="0,0,0,8"
-                                    Padding="12"
-                                    Background="{DynamicResource Clipt.Brush.Surface}"
-                                    CornerRadius="7">
-                                <TextBlock FontFamily="{StaticResource Clipt.Font.Mono}"
-                                           FontSize="12"
-                                           Foreground="{DynamicResource Clipt.Brush.TextSecondary}"
-                                           Text="{Binding}" />
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                    Visibility="{Binding HasFilePathPreviews, Converter={StaticResource BoolToVisibilityConverter}}">
+                <StackPanel>
+                    <TextBlock Margin="0,0,0,12"
+                               FontSize="12"
+                               Foreground="{DynamicResource Clipt.Brush.TextMuted}"
+                               Text="{Binding FilePathSummary}" />
+
+                    <ItemsControl ItemsSource="{Binding FilePathPreviews}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,0,0,6"
+                                        Padding="12,10"
+                                        Background="{DynamicResource Clipt.Brush.Surface}"
+                                        CornerRadius="7">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <Border Grid.Column="0"
+                                                Width="32"
+                                                Height="32"
+                                                Margin="0,0,10,0"
+                                                VerticalAlignment="Center"
+                                                Background="{DynamicResource Clipt.Brush.SurfaceAlt}"
+                                                CornerRadius="4">
+                                            <TextBlock HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="12"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource Clipt.Brush.TextSecondary}"
+                                                       Text="{Binding KindGlyph}" />
+                                        </Border>
+
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock FontSize="13"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource Clipt.Brush.Text}"
+                                                       Text="{Binding Name}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Margin="0,3,0,0"
+                                                       FontSize="11"
+                                                       Foreground="{DynamicResource Clipt.Brush.TextMuted}"
+                                                       Text="{Binding ParentPath}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="2"
+                                                    Margin="12,0,0,0"
+                                                    VerticalAlignment="Center"
+                                                    HorizontalAlignment="Right">
+                                            <Border Padding="5,2"
+                                                    HorizontalAlignment="Right"
+                                                    Background="{DynamicResource Clipt.Brush.AccentSoft}"
+                                                    CornerRadius="3">
+                                                <TextBlock FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource Clipt.Brush.Accent}"
+                                                           Text="{Binding ExtensionLabel}" />
+                                            </Border>
+                                            <TextBlock Margin="0,4,0,0"
+                                                       HorizontalAlignment="Right"
+                                                       FontSize="11"
+                                                       Foreground="{DynamicResource Clipt.Brush.TextMuted}"
+                                                       Text="{Binding StatusLabel}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
             </Border>
         </Grid>
 

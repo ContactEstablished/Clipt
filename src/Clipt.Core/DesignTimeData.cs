@@ -228,8 +228,8 @@ public static class DesignTimeData
             // ── File paths ─────────────────────────────────────
             Create(
                 "Design references",
-                "C:\\Users\\Matt\\Pictures\\clipt-mockup.png; C:\\Users\\Matt\\Documents\\phase-one-notes.md",
-                "C:\\Users\\Matt\\Pictures\\clipt-mockup.png\r\nC:\\Users\\Matt\\Documents\\phase-one-notes.md",
+                "C:\\Users\\Matt\\Pictures\\clipt-mockup.png; C:\\Users\\Matt\\Documents\\phase-one-notes.md; C:\\Users\\Matt\\Designs\\exported-assets",
+                "C:\\Users\\Matt\\Pictures\\clipt-mockup.png\r\nC:\\Users\\Matt\\Documents\\phase-one-notes.md\r\nC:\\Users\\Matt\\Designs\\exported-assets",
                 ContentType.File,
                 "File Explorer",
                 now.AddDays(-1),
@@ -237,6 +237,7 @@ public static class DesignTimeData
                 [
                     "C:\\Users\\Matt\\Pictures\\clipt-mockup.png",
                     "C:\\Users\\Matt\\Documents\\phase-one-notes.md",
+                    "C:\\Users\\Matt\\Designs\\exported-assets",
                 ]),
 
             // ── Image ──────────────────────────────────────────
