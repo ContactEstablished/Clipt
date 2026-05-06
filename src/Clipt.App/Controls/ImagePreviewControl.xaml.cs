@@ -43,8 +43,30 @@ public partial class ImagePreviewControl : UserControl
             return;
         }
 
-        control.ImageSource = string.IsNullOrWhiteSpace(imageUri)
-            ? null
-            : new BitmapImage(new Uri(imageUri, UriKind.RelativeOrAbsolute));
+        if (string.IsNullOrWhiteSpace(imageUri))
+        {
+            control.ImageSource = null;
+            return;
+        }
+
+        try
+        {
+            var uri = new Uri(imageUri, UriKind.RelativeOrAbsolute);
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.UriSource = uri;
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.EndInit();
+            if (bitmap.CanFreeze)
+            {
+                bitmap.Freeze();
+            }
+
+            control.ImageSource = bitmap;
+        }
+        catch
+        {
+            control.ImageSource = null;
+        }
     }
 }

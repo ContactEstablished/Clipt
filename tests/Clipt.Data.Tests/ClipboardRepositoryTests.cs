@@ -991,6 +991,39 @@ public sealed class ClipboardRepositoryTests : IAsyncDisposable
         items.Should().AllSatisfy(i => i.IsPinned.Should().BeTrue());
     }
 
+    [Fact]
+    public async Task SaveAsync_ImageItem_PersistsImageUri()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var item = CreateTestItem("Image capture test") with
+        {
+            ContentType = ContentType.Image,
+            ImageUri = "file:///C:/test/preview-cache/img_abc123.png",
+        };
+
+        var saved = await _repository.SaveAsync(item, CancellationToken.None);
+        saved.ImageUri.Should().Be("file:///C:/test/preview-cache/img_abc123.png");
+
+        var items = await _repository.GetItemsAsync(CancellationToken.None);
+        items.Should().ContainSingle();
+        items[0].ImageUri.Should().Be("file:///C:/test/preview-cache/img_abc123.png");
+    }
+
+    [Fact]
+    public async Task SaveAsync_ItemWithoutImageUri_PersistsNullImageUri()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var item = CreateTestItem("Text without image");
+
+        await _repository.SaveAsync(item, CancellationToken.None);
+
+        var items = await _repository.GetItemsAsync(CancellationToken.None);
+        items.Should().ContainSingle();
+        items[0].ImageUri.Should().BeNull();
+    }
+
     public async ValueTask DisposeAsync()
     {
         _repository.Dispose();

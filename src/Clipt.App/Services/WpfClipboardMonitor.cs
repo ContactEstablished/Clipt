@@ -25,6 +25,7 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
     private readonly IPrivacyFilter _privacyFilter;
     private readonly ISourceAppResolver _sourceAppResolver;
     private readonly ISettingsService _settingsService;
+    private readonly ImagePreviewCache _imagePreviewCache;
     private readonly ILogger<WpfClipboardMonitor> _logger;
 
     private HwndSource? _messageSource;
@@ -43,12 +44,14 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
         IPrivacyFilter privacyFilter,
         ISourceAppResolver sourceAppResolver,
         ISettingsService settingsService,
+        ImagePreviewCache imagePreviewCache,
         ILogger<WpfClipboardMonitor> logger)
     {
         _contentTypeDetector = contentTypeDetector;
         _privacyFilter = privacyFilter;
         _sourceAppResolver = sourceAppResolver;
         _settingsService = settingsService;
+        _imagePreviewCache = imagePreviewCache;
         _logger = logger;
     }
 
@@ -206,6 +209,11 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
                 return;
             }
 
+            if (TryCaptureImageClipboardItem())
+            {
+                return;
+            }
+
             if (!Clipboard.ContainsText())
             {
                 _logger.LogDebug("Clipboard update ignored: no supported clipboard content.");
@@ -312,6 +320,100 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
         catch (InvalidOperationException exception)
         {
             _logger.LogDebug(exception, "Clipboard file drop capture failed.");
+            return true;
+        }
+    }
+
+    private bool TryCaptureImageClipboardItem()
+    {
+        try
+        {
+            if (!Clipboard.ContainsImage())
+            {
+                return false;
+            }
+
+            var bitmap = Clipboard.GetImage();
+            if (bitmap is null)
+            {
+                _logger.LogDebug("Clipboard image was null; skipping.");
+                return false;
+            }
+
+            if (bitmap.CanFreeze)
+            {
+                bitmap.Freeze();
+            }
+
+            var width = bitmap.PixelWidth;
+            var height = bitmap.PixelHeight;
+            var estimatedSize = ImageClipboardMetadataHelper.EstimateRgbaByteSize(width, height);
+            var title = ImageClipboardMetadataHelper.CreateTitle(width, height);
+            var previewText = ImageClipboardMetadataHelper.CreatePreviewText(width, height, estimatedSize);
+
+            var imageUri = _imagePreviewCache.SavePreview(bitmap);
+
+            // Include the preview filename (or timestamp) in the hash so that
+            // two distinct screenshots with the same dimensions produce different hashes.
+            var hashInput = $"image:{width}x{height}:{imageUri ?? DateTimeOffset.UtcNow.Ticks.ToString()}";
+            var hash = ClipboardContentHasher.ComputeHash(hashInput);
+
+            if (hash == _lastContentHash)
+            {
+                _logger.LogDebug("Clipboard image ignored: duplicate hash {Hash}.", hash);
+                return true;
+            }
+
+            var metaText = $"width={width};height={height};bytes={estimatedSize}";
+            var formats = new List<ClipboardFormat>
+            {
+                new(ClipboardFormatNames.Bitmap, metaText),
+            };
+
+            var source = _sourceAppResolver.Resolve();
+            var now = DateTimeOffset.Now;
+
+            var item = new ClipboardItem
+            {
+                Id = Guid.NewGuid(),
+                ContentHash = hash,
+                Title = title,
+                PreviewText = previewText,
+                Content = metaText,
+                ContentType = ContentType.Image,
+                SourceAppName = source.Name,
+                SourceAppPath = source.Path,
+                CreatedAt = now,
+                ByteSize = estimatedSize,
+                LastUsedAt = now,
+                UseCount = 0,
+                ImageUri = imageUri,
+                Formats = formats,
+            };
+
+            if (!_privacyFilter.ShouldCapture(item, _cachedSettings))
+            {
+                _logger.LogDebug(
+                    "Clipboard image from '{SourceApp}' blocked by privacy filter.",
+                    item.SourceAppName);
+                return true;
+            }
+
+            _lastContentHash = hash;
+            _logger.LogDebug(
+                "Clipboard image captured: '{Title}' {Width}x{Height} (hash {Hash}).",
+                title, width, height, hash);
+            ClipboardItemCaptured?.Invoke(this, item);
+            return true;
+        }
+        catch (ExternalException exception)
+        {
+            _logger.LogDebug(exception, "Clipboard was temporarily unavailable during image capture.");
+            return true;
+        }
+        catch (InvalidOperationException exception)
+        {
+            _logger.LogDebug(exception, "Clipboard image capture failed.");
             return true;
         }
     }

@@ -45,7 +45,8 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
                     is_favorite,
                     created_at,
                     last_used_at,
-                    use_count
+                    use_count,
+                    image_uri
                 FROM clipboard_items
                 ORDER BY is_pinned DESC, pin_order, created_at DESC
                 """;
@@ -115,7 +116,8 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
                     is_favorite,
                     created_at,
                     last_used_at,
-                    use_count
+                    use_count,
+                    image_uri
                 FROM clipboard_items
                 WHERE id IN (
                     SELECT item_id FROM clipboard_items_fts
@@ -180,7 +182,8 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
                     is_favorite,
                     created_at,
                     last_used_at,
-                    use_count
+                    use_count,
+                    image_uri
                 FROM clipboard_items
                 WHERE content_hash = @hash
                 """;
@@ -242,7 +245,8 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
                     is_favorite,
                     created_at,
                     last_used_at,
-                    use_count
+                    use_count,
+                    image_uri
                 ) VALUES (
                     @id,
                     @hash,
@@ -259,7 +263,8 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
                     @is_favorite,
                     @created_at,
                     @last_used_at,
-                    @use_count
+                    @use_count,
+                    @image_uri
                 )
                 """;
 
@@ -279,6 +284,7 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
             insertCommand.Parameters.AddWithValue("@created_at", item.CreatedAt.ToUnixTimeMilliseconds());
             insertCommand.Parameters.AddWithValue("@last_used_at", item.LastUsedAt.ToUnixTimeMilliseconds());
             insertCommand.Parameters.AddWithValue("@use_count", item.UseCount);
+            insertCommand.Parameters.AddWithValue("@image_uri", (object?)item.ImageUri ?? DBNull.Value);
 
             await insertCommand.ExecuteNonQueryAsync(cancellationToken);
 
@@ -515,6 +521,7 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
             CreatedAt = DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(12)),
             LastUsedAt = DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(13)),
             UseCount = (int)reader.GetInt64(14),
+            ImageUri = reader.IsDBNull(15) ? null : reader.GetString(15),
             FilePaths = [],
             // Formats are loaded separately via LoadFormatsForItemsAsync.
         };

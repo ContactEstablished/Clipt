@@ -7,4 +7,7 @@ public static class ClipboardFormatNames
     public const string Html = "HTML Format";
     public const string Rtf = "Rich Text Format";
     public const string FileDrop = "FileDrop";
+    public const string Bitmap = "Bitmap";
+    public const string Dib = "DeviceIndependentBitmap";
+    public const string Png = "PNG";
 }

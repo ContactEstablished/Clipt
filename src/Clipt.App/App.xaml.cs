@@ -85,6 +85,7 @@ public partial class App : Application
         builder.Services.AddSingleton<ISearchService, SearchService>();
         builder.Services.AddSingleton<IContentTypeDetector, ContentTypeDetector>();
         builder.Services.AddSingleton<IPrivacyFilter, PrivacyFilter>();
+        builder.Services.AddSingleton<ImagePreviewCache>();
         builder.Services.AddSingleton<IClipboardMonitor, WpfClipboardMonitor>();
         builder.Services.AddSingleton<ISourceAppResolver, WindowsSourceAppResolver>();
         builder.Services.AddSingleton<ForegroundWindowTracker>();
