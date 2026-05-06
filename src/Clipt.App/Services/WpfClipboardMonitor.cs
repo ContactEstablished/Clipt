@@ -204,7 +204,8 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
                 return;
             }
 
-            var item = CreateTextItem(text);
+            var formats = CaptureTextFormats(text);
+            var item = CreateTextItem(text, formats);
             if (!_privacyFilter.ShouldCapture(item, _cachedSettings))
             {
                 _logger.LogDebug(
@@ -227,7 +228,7 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
         }
     }
 
-    private ClipboardItem CreateTextItem(string text)
+    private ClipboardItem CreateTextItem(string text, IReadOnlyList<ClipboardFormat> formats)
     {
         var contentType = _contentTypeDetector.Detect(text);
         var title = CreateTitle(text, contentType);
@@ -258,10 +259,7 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
             ByteSize = Encoding.UTF8.GetByteCount(text),
             LastUsedAt = now,
             UseCount = 0,
-            Formats =
-            [
-                new ClipboardFormat("CF_UNICODETEXT", text),
-            ],
+            Formats = formats,
         };
     }
 
@@ -278,6 +276,66 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
         }
 
         return firstLine.Length <= 64 ? firstLine : string.Concat(firstLine.AsSpan(0, 61), "...");
+    }
+
+    /// <summary>
+    /// Captures available text-based clipboard formats at capture time.
+    /// Each format is probed independently and failures are silently ignored
+    /// so one unavailable format does not block capture of the others.
+    /// </summary>
+    private static List<ClipboardFormat> CaptureTextFormats(string unicodeText)
+    {
+        var formats = new List<ClipboardFormat>
+        {
+            new(DataFormats.UnicodeText, unicodeText),
+        };
+
+        // ANSI text
+        try
+        {
+            if (Clipboard.ContainsText(TextDataFormat.Text))
+            {
+                var text = Clipboard.GetText(TextDataFormat.Text);
+                if (!string.IsNullOrEmpty(text))
+                {
+                    formats.Add(new ClipboardFormat(DataFormats.Text, text));
+                }
+            }
+        }
+        catch (ExternalException) { /* clipboard unavailable during format probe */ }
+        catch (InvalidOperationException) { /* transient failure, skip this format */ }
+
+        // HTML Format
+        try
+        {
+            if (Clipboard.ContainsData(DataFormats.Html))
+            {
+                var html = Clipboard.GetData(DataFormats.Html) as string;
+                if (!string.IsNullOrEmpty(html))
+                {
+                    formats.Add(new ClipboardFormat(DataFormats.Html, html));
+                }
+            }
+        }
+        catch (ExternalException) { }
+        catch (InvalidOperationException) { }
+
+        // Rich Text Format
+        try
+        {
+            if (Clipboard.ContainsData(DataFormats.Rtf))
+            {
+                var rtf = Clipboard.GetData(DataFormats.Rtf) as string;
+                if (!string.IsNullOrEmpty(rtf))
+                {
+                    formats.Add(new ClipboardFormat(DataFormats.Rtf, rtf));
+                }
+            }
+        }
+        catch (ExternalException) { }
+        catch (InvalidOperationException) { }
+
+        return formats;
     }
 
     private void StopListener()

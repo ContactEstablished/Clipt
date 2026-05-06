@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.RegularExpressions;
 using Clipt.Core.Models;
 using Clipt.Core.Services;
@@ -50,10 +51,25 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
                 """;
 
             var items = new List<ClipboardItem>();
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            while (await reader.ReadAsync(cancellationToken))
+            await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
             {
-                items.Add(MapRow(reader));
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    items.Add(MapRow(reader));
+                }
+            }
+
+            if (items.Count > 0)
+            {
+                var formatsMap = await LoadFormatsForItemsAsync(
+                    connection, items.Select(i => i.Id.ToString()).ToList(), cancellationToken);
+                for (var i = 0; i < items.Count; i++)
+                {
+                    if (formatsMap.TryGetValue(items[i].Id.ToString(), out var formats))
+                    {
+                        items[i] = items[i] with { Formats = formats };
+                    }
+                }
             }
 
             return items;
@@ -110,10 +126,25 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
             command.Parameters.AddWithValue("@query", ftsQuery);
 
             var items = new List<ClipboardItem>();
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            while (await reader.ReadAsync(cancellationToken))
+            await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
             {
-                items.Add(MapRow(reader));
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    items.Add(MapRow(reader));
+                }
+            }
+
+            if (items.Count > 0)
+            {
+                var formatsMap = await LoadFormatsForItemsAsync(
+                    connection, items.Select(i => i.Id.ToString()).ToList(), cancellationToken);
+                for (var i = 0; i < items.Count; i++)
+                {
+                    if (formatsMap.TryGetValue(items[i].Id.ToString(), out var formats))
+                    {
+                        items[i] = items[i] with { Formats = formats };
+                    }
+                }
             }
 
             return items;
@@ -160,8 +191,14 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
             {
                 // Duplicate found: update last_used_at and use_count, return existing item.
                 // The UPDATE trigger (trg_clipboard_items_fts_au) keeps FTS in sync automatically.
+                // Formats are not replaced on duplicate — the original capture's formats
+                // are preserved. This is acceptable for now since duplicate content
+                // already has the same format payloads.
                 var existingItem = MapRow(checkReader);
                 await checkReader.DisposeAsync();
+
+                var formats = await LoadFormatsForSingleItemAsync(connection, existingItem.Id, cancellationToken);
+                existingItem = existingItem with { Formats = formats };
 
                 var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                 using var updateCommand = connection.CreateCommand();
@@ -245,7 +282,10 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
 
             await insertCommand.ExecuteNonQueryAsync(cancellationToken);
 
-            _logger.LogDebug("Inserted clipboard item {Id} with hash {Hash}.", item.Id, item.ContentHash);
+            // Persist captured clipboard formats alongside the item row.
+            await InsertFormatsAsync(connection, item, cancellationToken);
+
+            _logger.LogDebug("Inserted clipboard item {Id} with hash {Hash} and {FormatCount} formats.", item.Id, item.ContentHash, item.Formats.Count);
             return item;
         }
         finally
@@ -366,6 +406,12 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
         var connectionString = $"Data Source={_pathProvider.GetDatabasePath()}";
         _connection = new SqliteConnection(connectionString);
         await _connection.OpenAsync(cancellationToken);
+
+        // Enable foreign key support so ON DELETE CASCADE works for clipboard_formats.
+        using var pragmaCommand = _connection.CreateCommand();
+        pragmaCommand.CommandText = "PRAGMA foreign_keys = ON";
+        await pragmaCommand.ExecuteNonQueryAsync(cancellationToken);
+
         return _connection;
     }
 
@@ -419,8 +465,117 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
             CreatedAt = DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(12)),
             LastUsedAt = DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(13)),
             UseCount = (int)reader.GetInt64(14),
-            Formats = [],
             FilePaths = [],
+            // Formats are loaded separately via LoadFormatsForItemsAsync.
         };
+    }
+
+    /// <summary>
+    /// Loads clipboard formats for a batch of item IDs in a single query,
+    /// avoiding N+1 queries when loading history or search results.
+    /// </summary>
+    private static async Task<Dictionary<string, IReadOnlyList<ClipboardFormat>>> LoadFormatsForItemsAsync(
+        SqliteConnection connection,
+        IReadOnlyList<string> itemIds,
+        CancellationToken cancellationToken)
+    {
+        var map = new Dictionary<string, IReadOnlyList<ClipboardFormat>>(itemIds.Count);
+        if (itemIds.Count == 0) return map;
+
+        using var command = connection.CreateCommand();
+        var paramNames = new string[itemIds.Count];
+        for (var i = 0; i < itemIds.Count; i++)
+        {
+            paramNames[i] = $"@id{i}";
+            command.Parameters.AddWithValue(paramNames[i], itemIds[i]);
+        }
+
+        command.CommandText = $"""
+            SELECT item_id, format_name, payload_text, payload, byte_size
+            FROM clipboard_formats
+            WHERE item_id IN ({string.Join(", ", paramNames)})
+            ORDER BY item_id, id
+            """;
+
+        var temp = new Dictionary<string, List<ClipboardFormat>>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var itemId = reader.GetString(0);
+            if (!temp.TryGetValue(itemId, out var list))
+            {
+                list = [];
+                temp[itemId] = list;
+            }
+
+            list.Add(new ClipboardFormat(
+                Name: reader.GetString(1),
+                TextPayload: reader.IsDBNull(2) ? null : reader.GetString(2),
+                BinaryPayload: reader.IsDBNull(3) ? null : (byte[])reader.GetValue(3)));
+        }
+
+        foreach (var kvp in temp)
+        {
+            map[kvp.Key] = kvp.Value;
+        }
+
+        return map;
+    }
+
+    /// <summary>
+    /// Loads formats for a single item, used in the duplicate-Save path.
+    /// </summary>
+    private static async Task<IReadOnlyList<ClipboardFormat>> LoadFormatsForSingleItemAsync(
+        SqliteConnection connection,
+        Guid itemId,
+        CancellationToken cancellationToken)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT item_id, format_name, payload_text, payload, byte_size
+            FROM clipboard_formats
+            WHERE item_id = @item_id
+            ORDER BY id
+            """;
+        command.Parameters.AddWithValue("@item_id", itemId.ToString());
+
+        var formats = new List<ClipboardFormat>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            formats.Add(new ClipboardFormat(
+                Name: reader.GetString(1),
+                TextPayload: reader.IsDBNull(2) ? null : reader.GetString(2),
+                BinaryPayload: reader.IsDBNull(3) ? null : (byte[])reader.GetValue(3)));
+        }
+
+        return formats;
+    }
+
+    /// <summary>
+    /// Inserts clipboard format rows for a newly saved item.
+    /// </summary>
+    private static async Task InsertFormatsAsync(
+        SqliteConnection connection,
+        ClipboardItem item,
+        CancellationToken cancellationToken)
+    {
+        if (item.Formats.Count == 0) return;
+
+        foreach (var format in item.Formats)
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                INSERT INTO clipboard_formats (item_id, format_name, payload_text, payload, byte_size)
+                VALUES (@item_id, @name, @text, @blob, @size)
+                """;
+            command.Parameters.AddWithValue("@item_id", item.Id.ToString());
+            command.Parameters.AddWithValue("@name", format.Name);
+            command.Parameters.AddWithValue("@text", (object?)format.TextPayload ?? DBNull.Value);
+            command.Parameters.AddWithValue("@blob", (object?)format.BinaryPayload ?? DBNull.Value);
+            command.Parameters.AddWithValue("@size",
+                format.TextPayload is not null ? Encoding.UTF8.GetByteCount(format.TextPayload) : 0);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
     }
 }

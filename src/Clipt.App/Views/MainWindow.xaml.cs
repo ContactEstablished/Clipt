@@ -30,6 +30,7 @@ public partial class MainWindow : Window
     private readonly IInputSimulator _inputSimulator;
     private bool _isQuitting;
     private bool _isInitialized;
+    private bool _isPasteInProgress;
 
     private DateTime _lastSaveTime = DateTime.MinValue;
     private AppSettings _pendingSave = new();
@@ -351,6 +352,12 @@ public partial class MainWindow : Window
 
     private async Task PasteSelectedAndHideAsync(ModifierKeys modifiers)
     {
+        if (_isPasteInProgress)
+        {
+            _logger.LogDebug("Paste already in progress; ignoring duplicate Enter/Ctrl+Enter.");
+            return;
+        }
+
         var selected = _viewModel.SelectedItem;
         if (selected is null)
         {
@@ -358,6 +365,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        _isPasteInProgress = true;
         try
         {
             // Shift+Enter = plain text. Ctrl+Enter is reserved for markdown/raw
@@ -396,6 +404,10 @@ public partial class MainWindow : Window
         catch (Exception exception)
         {
             _logger.LogError(exception, "Paste operation failed for item {Id}. Keeping Clipt open.", selected.Id);
+        }
+        finally
+        {
+            _isPasteInProgress = false;
         }
     }
 

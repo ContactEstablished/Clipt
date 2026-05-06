@@ -44,6 +44,7 @@ public sealed class ClipboardRepositoryTests : IAsyncDisposable
 
         tables.Should().Contain("clipboard_items");
         tables.Should().Contain("clipboard_items_fts");
+        tables.Should().Contain("clipboard_formats");
         tables.Should().Contain("schema_migrations");
 
         using var indexCommand = connection.CreateCommand();
@@ -525,6 +526,173 @@ public sealed class ClipboardRepositoryTests : IAsyncDisposable
         rowsDeleted.Should().Be(0);
     }
 
+    // ── Format persistence ──────────────────────────────────────────
+
+    [Fact]
+    public async Task SaveAsync_PersistsFormats()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var item = CreateTestItemWithFormats("Formatted content",
+            formats: [("UnicodeText", "Formatted content"),
+                      ("HTML Format", "<html><b>Formatted content</b></html>")]);
+
+        var saved = await _repository.SaveAsync(item, CancellationToken.None);
+
+        saved.Formats.Should().HaveCount(2);
+        saved.Formats[0].Name.Should().Be("UnicodeText");
+        saved.Formats[1].Name.Should().Be("HTML Format");
+    }
+
+    [Fact]
+    public async Task GetItemsAsync_ReturnsFormats()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        await _repository.SaveAsync(CreateTestItemWithFormats("Item A",
+            formats: [("UnicodeText", "Item A")]), CancellationToken.None);
+        await _repository.SaveAsync(CreateTestItemWithFormats("Item B",
+            formats: [("UnicodeText", "Item B"),
+                      ("HTML Format", "<p>Item B</p>")]), CancellationToken.None);
+
+        var items = await _repository.GetItemsAsync(CancellationToken.None);
+        items.Should().HaveCount(2);
+
+        var itemA = items.Should().ContainSingle(i => i.Title == "Item A").Subject;
+        itemA.Formats.Should().HaveCount(1);
+
+        var itemB = items.Should().ContainSingle(i => i.Title == "Item B").Subject;
+        itemB.Formats.Should().HaveCount(2);
+        itemB.Formats.Should().Contain(f => f.Name == "HTML Format");
+    }
+
+    [Fact]
+    public async Task SearchAsync_ReturnsFormats()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        await _repository.SaveAsync(CreateTestItemWithFormats("Searchable with formats",
+            formats: [("UnicodeText", "Searchable with formats"),
+                      ("Rich Text Format", @"{\rtf1 Rich content}")]), CancellationToken.None);
+        await _repository.SaveAsync(CreateTestItem("Plain item"), CancellationToken.None);
+
+        var results = await _repository.SearchAsync("Searchable", CancellationToken.None);
+        results.Should().ContainSingle();
+        results[0].Formats.Should().HaveCount(2);
+        results[0].Formats.Should().Contain(f => f.Name == "Rich Text Format");
+    }
+
+    [Fact]
+    public async Task DeleteAsync_DeletesAssociatedFormats()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var item = CreateTestItemWithFormats("To be deleted",
+            formats: [("UnicodeText", "To be deleted"),
+                      ("HTML Format", "<b>To be deleted</b>")]);
+
+        await _repository.SaveAsync(item, CancellationToken.None);
+        await _repository.DeleteAsync(item.Id, CancellationToken.None);
+
+        // Verify no orphaned format rows.
+        await using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(1) FROM clipboard_formats WHERE item_id = @id";
+        cmd.Parameters.AddWithValue("@id", item.Id.ToString());
+        var count = (long)(await cmd.ExecuteScalarAsync())!;
+        count.Should().Be(0, "format rows should be cascade-deleted with the parent item");
+    }
+
+    [Fact]
+    public async Task ClearUnpinnedAsync_DeletesFormatsForUnpinnedAndKeepsForPinned()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var pinned = CreateTestItemWithFormats("Pinned formatted", isPinned: true,
+            formats: [("UnicodeText", "Pinned formatted"),
+                      ("HTML Format", "<i>Pinned</i>")]);
+        var unpinned = CreateTestItemWithFormats("Unpinned formatted",
+            formats: [("UnicodeText", "Unpinned formatted"),
+                      ("Rich Text Format", @"{\rtf1 Unpinned}")]);
+
+        await _repository.SaveAsync(pinned, CancellationToken.None);
+        await _repository.SaveAsync(unpinned, CancellationToken.None);
+
+        await _repository.ClearUnpinnedAsync(CancellationToken.None);
+
+        // Pinned item and its formats should survive.
+        var items = await _repository.GetItemsAsync(CancellationToken.None);
+        items.Should().ContainSingle();
+        items[0].Id.Should().Be(pinned.Id);
+        items[0].Formats.Should().HaveCount(2);
+
+        // Verify no orphaned format rows for the deleted unpinned item.
+        await using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(1) FROM clipboard_formats WHERE item_id = @id";
+        cmd.Parameters.AddWithValue("@id", unpinned.Id.ToString());
+        var count = (long)(await cmd.ExecuteScalarAsync())!;
+        count.Should().Be(0, "unpinned format rows should be cascade-deleted");
+    }
+
+    [Fact]
+    public async Task ExistingItems_WithNoFormatRows_LoadWithEmptyFormats()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        // Insert a legacy item directly without any format rows.
+        var legacyId = Guid.NewGuid().ToString();
+        await using (var connection = new SqliteConnection($"Data Source={_dbPath}"))
+        {
+            await connection.OpenAsync();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = """
+                INSERT INTO clipboard_items (id, content_hash, primary_format, content_type, title,
+                    preview_text, content_text, source_app_name, byte_size, created_at, last_used_at, use_count)
+                VALUES (@id, @hash, 'text', 'Text', 'Legacy item', 'Legacy', 'legacy content',
+                    'LegacyApp', 0, @ts, @ts, 0)
+                """;
+            cmd.Parameters.AddWithValue("@id", legacyId);
+            cmd.Parameters.AddWithValue("@hash", "legacy-hash-001");
+            cmd.Parameters.AddWithValue("@ts", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        // The legacy item should load with an empty Formats list, not throw.
+        var items = await _repository.GetItemsAsync(CancellationToken.None);
+        items.Should().ContainSingle();
+        items[0].Formats.Should().BeEmpty("legacy items with no format rows should load fine");
+    }
+
+    [Fact]
+    public async Task DuplicateSaveAsync_DoesNotCreateDuplicateFormatRows()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var original = CreateTestItemWithFormats("Duplicate content",
+            formats: [("UnicodeText", "Duplicate content"),
+                      ("HTML Format", "<html>Duplicate</html>")]);
+
+        await _repository.SaveAsync(original, CancellationToken.None);
+
+        var duplicate = CreateTestItemWithFormats("Duplicate content",
+            formats: [("UnicodeText", "Duplicate content"),
+                      ("HTML Format", "<html>Duplicate</html>")]);
+
+        await _repository.SaveAsync(duplicate, CancellationToken.None);
+
+        // Verify exactly one set of formats exists for this item.
+        await using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(1) FROM clipboard_formats WHERE item_id = @id";
+        cmd.Parameters.AddWithValue("@id", original.Id.ToString());
+        var count = (long)(await cmd.ExecuteScalarAsync())!;
+        count.Should().Be(2, "duplicate save should not create additional format rows");
+    }
+
     [Fact]
     public async Task ClearUnpinnedAsync_AllPinnedRemovesNone()
     {
@@ -583,5 +751,17 @@ public sealed class ClipboardRepositoryTests : IAsyncDisposable
             LastUsedAt = now,
             UseCount = 0,
         };
+    }
+
+    private static ClipboardItem CreateTestItemWithFormats(
+        string content,
+        bool isPinned = false,
+        (string Name, string Text)[]? formats = null)
+    {
+        var item = CreateTestItem(content, isPinned: isPinned);
+        var formatList = formats is not null
+            ? formats.Select(f => new ClipboardFormat(f.Name, f.Text)).ToList()
+            : [];
+        return item with { Formats = formatList };
     }
 }
