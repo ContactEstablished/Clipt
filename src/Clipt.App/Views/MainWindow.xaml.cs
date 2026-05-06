@@ -62,6 +62,7 @@ public partial class MainWindow : Window
         LocationChanged += OnWindowLocationChanged;
 
         _hotkeyService.HotkeyPressed += OnHotkeyPressed;
+        _clipboardMonitor.CaptureStateChanged += OnCaptureStateChanged;
     }
 
     public ICommand ShowFromTrayCommand { get; }
@@ -216,8 +217,15 @@ public partial class MainWindow : Window
         var paused = !_clipboardMonitor.IsPaused;
         await _clipboardMonitor.SetPausedAsync(paused, CancellationToken.None);
         _pendingSave = _pendingSave with { IsCapturePaused = paused };
-        UpdateTrayPauseState(paused);
+        // CaptureStateChanged handler updates tray text and view model.
         await SaveCurrentSettingsAsync();
+    }
+
+    private void OnCaptureStateChanged(object? sender, EventArgs e)
+    {
+        var paused = _clipboardMonitor.IsPaused;
+        _viewModel.IsCapturePaused = paused;
+        UpdateTrayPauseState(paused);
     }
 
     private async void OnClearHistoryTrayClick(object sender, RoutedEventArgs e)
@@ -425,6 +433,7 @@ public partial class MainWindow : Window
             _pendingSave = settings;
 
             _viewModel.IsWorkMode = settings.IsWorkMode;
+            _viewModel.IsCapturePaused = settings.IsCapturePaused;
             Width = settings.IsWorkMode ? settings.WorkModeWidth : settings.CaptureModeWidth;
             Height = settings.Height;
             Topmost = settings.AlwaysOnTop;

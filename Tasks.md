@@ -293,7 +293,7 @@ Clipt/
 - [ ] Mouse + keyboard friendly
 - [ ] Always-on-top toggle
 - [ ] **Transparency slider** (10% to 100%) bound to `Window.Opacity`, persists in settings
-- [ ] Prominent paused-capture visual cue in the main window (e.g., flag/banner/status pill) so users can immediately tell clipboard capture is paused
+- [x] Prominent paused-capture visual cue in the main window (e.g., flag/banner/status pill) so users can immediately tell clipboard capture is paused
 - [ ] Drag-to-move on title area
 - [ ] Remembers last position and size
 - [ ] Drop shadow / acrylic backdrop on Windows 11 (via `DwmSetWindowAttribute`)

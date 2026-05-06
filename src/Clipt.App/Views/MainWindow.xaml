@@ -243,6 +243,16 @@
                                            Foreground="{DynamicResource Clipt.Brush.Accent}"
                                            Text="{Binding ModeLabel}" />
                             </Border>
+                            <Border Margin="6,0,0,0"
+                                    Padding="8,3"
+                                    Background="{DynamicResource Clipt.Brush.PausedAccentSoft}"
+                                    CornerRadius="999"
+                                    Visibility="{Binding IsCapturePaused, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <TextBlock FontSize="11"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource Clipt.Brush.PausedAccent}"
+                                           Text="Paused" />
+                            </Border>
                         </StackPanel>
 
                         <StackPanel Grid.Column="1"

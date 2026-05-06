@@ -56,6 +56,9 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     public partial string ActiveNavigationItem { get; set; } = NavigationItems.Clipboard;
 
+    [ObservableProperty]
+    public partial bool IsCapturePaused { get; set; }
+
     public bool IsClipboardView => ActiveNavigationItem == NavigationItems.Clipboard;
 
     public string ModeLabel => IsWorkMode ? "Work" : "Capture";

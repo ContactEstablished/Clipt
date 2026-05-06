@@ -9,6 +9,8 @@
     <Color x:Key="Clipt.Color.TextMuted">#71717A</Color>
     <Color x:Key="Clipt.Color.Accent">#14B8A6</Color>
     <Color x:Key="Clipt.Color.AccentSoft">#262F31</Color>
+    <Color x:Key="Clipt.Color.PausedAccent">#E8A838</Color>
+    <Color x:Key="Clipt.Color.PausedAccentSoft">#30281F</Color>
     <Color x:Key="Clipt.Color.Highlight">#335F5B</Color>
 
     <SolidColorBrush x:Key="Clipt.Brush.Background" Color="{StaticResource Clipt.Color.Background}" />
@@ -20,6 +22,8 @@
     <SolidColorBrush x:Key="Clipt.Brush.TextMuted" Color="{StaticResource Clipt.Color.TextMuted}" />
     <SolidColorBrush x:Key="Clipt.Brush.Accent" Color="{StaticResource Clipt.Color.Accent}" />
     <SolidColorBrush x:Key="Clipt.Brush.AccentSoft" Color="{StaticResource Clipt.Color.AccentSoft}" />
+    <SolidColorBrush x:Key="Clipt.Brush.PausedAccent" Color="{StaticResource Clipt.Color.PausedAccent}" />
+    <SolidColorBrush x:Key="Clipt.Brush.PausedAccentSoft" Color="{StaticResource Clipt.Color.PausedAccentSoft}" />
     <SolidColorBrush x:Key="Clipt.Brush.Highlight" Color="{StaticResource Clipt.Color.Highlight}" />
 
     <LinearGradientBrush x:Key="Clipt.Brush.Window" StartPoint="0,0" EndPoint="0,1">
