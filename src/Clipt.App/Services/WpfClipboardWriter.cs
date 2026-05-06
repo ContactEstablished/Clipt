@@ -1,6 +1,8 @@
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Collections.Specialized;
+using System.Windows.Media.Imaging;
 using Clipt.Core.Models;
 using Clipt.Core.Services;
 using Microsoft.Extensions.Logging;
@@ -28,16 +30,25 @@ public sealed class WpfClipboardWriter(ILogger<WpfClipboardWriter> logger) : ICl
 
     public async Task WriteAsync(ClipboardItem item, ClipboardWriteOptions options, CancellationToken cancellationToken)
     {
-        var text = item.Content;
-        if (string.IsNullOrEmpty(text))
-        {
-            logger.LogDebug("Clipboard item {Id} has no text content to write.", item.Id);
-            return;
-        }
-
         await _writeLock.WaitAsync(cancellationToken);
         try
         {
+            // Image items in Auto mode: attempt to write the cached
+            // preview bitmap before falling back to metadata text.
+            if (item.ContentType == ContentType.Image && options.PasteMode == PasteMode.Auto)
+            {
+                if (await TryWriteImageWithRetryAsync(item, cancellationToken))
+                    return;
+                // Fall through to plain text below.
+            }
+
+            var text = item.Content;
+            if (string.IsNullOrEmpty(text))
+            {
+                logger.LogDebug("Clipboard item {Id} has no text content to write.", item.Id);
+                return;
+            }
+
             if (options.PasteMode == PasteMode.PlainText || item.Formats.Count <= 1)
             {
                 await WriteTextWithRetryAsync(text, cancellationToken);
@@ -162,6 +173,139 @@ public sealed class WpfClipboardWriter(ILogger<WpfClipboardWriter> logger) : ICl
 
         logger.LogError("Failed to write multi-format data after {MaxRetries} attempts.", MaxRetries);
         throw new ExternalException("CLIPBRD_E_CANT_OPEN after max retries", unchecked((int)0x800401D0));
+    }
+
+    // ── Image write ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Attempts to write a cached image preview to the system clipboard.
+    /// Returns <c>true</c> on success. Returns <c>false</c> when the
+    /// preview file is missing, cannot be loaded, or the write fails
+    /// for a non-busy reason (caller should fall back to text).
+    /// </summary>
+    private async Task<bool> TryWriteImageWithRetryAsync(ClipboardItem item, CancellationToken cancellationToken)
+    {
+        var localPath = FilePathDisplayHelper.ConvertFileUriToLocalPath(item.ImageUri);
+        if (localPath is null || !File.Exists(localPath))
+        {
+            logger.LogDebug(
+                "Image item {Id} has no cached preview at {Path}, falling back to text.",
+                item.Id,
+                localPath ?? "<null>");
+            return false;
+        }
+
+        BitmapSource bitmap;
+        try
+        {
+            bitmap = LoadImageFromFile(localPath);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(
+                ex,
+                "Failed to load image {Path} for item {Id}, falling back to text.",
+                localPath,
+                item.Id);
+            return false;
+        }
+
+        for (var attempt = 0; attempt < MaxRetries; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            bool busy;
+            try
+            {
+                busy = await TryWriteImageOnDispatcherAsync(bitmap);
+            }
+            catch (Exception ex) when (!IsClipboardBusy(ex))
+            {
+                logger.LogWarning(
+                    ex,
+                    "Image clipboard write failed for item {Id}, falling back to text.",
+                    item.Id);
+                return false;
+            }
+
+            if (!busy)
+            {
+                logger.LogInformation(
+                    "Wrote image {Width}x{Height} from {Path} for item {Id} to clipboard (attempt {Attempt}).",
+                    bitmap.PixelWidth,
+                    bitmap.PixelHeight,
+                    localPath,
+                    item.Id,
+                    attempt + 1);
+                return true;
+            }
+
+            if (attempt == MaxRetries - 1) break;
+
+            var backoff = RetryBackoffMs[attempt];
+            logger.LogDebug(
+                "Clipboard busy during image write, retrying in {BackoffMs}ms (attempt {Attempt}/{MaxRetries}).",
+                backoff,
+                attempt + 1,
+                MaxRetries);
+
+            await Task.Delay(backoff, cancellationToken);
+        }
+
+        logger.LogWarning(
+            "Failed to write image to clipboard after {MaxRetries} attempts for item {Id}, falling back to text.",
+            MaxRetries,
+            item.Id);
+        return false;
+    }
+
+    /// <summary>
+    /// Invokes <see cref="Clipboard.SetImage"/> on the WPF dispatcher
+    /// with internal exception capture so the retry loop can handle
+    /// clipboard-busy errors.
+    /// </summary>
+    /// <returns>true if the clipboard was busy and the caller should retry.</returns>
+    private async Task<bool> TryWriteImageOnDispatcherAsync(BitmapSource bitmap)
+    {
+        Exception? captured = null;
+
+        await Application.Current.Dispatcher.InvokeAsync(() =>
+        {
+            try
+            {
+                Clipboard.SetImage(bitmap);
+            }
+            catch (Exception ex)
+            {
+                captured = ex;
+            }
+        });
+
+        if (captured is null) return false;
+
+        if (IsClipboardBusy(captured)) return true;
+
+        // Non-busy failure — rethrow so the caller can log and fall back.
+        throw captured;
+    }
+
+    /// <summary>
+    /// Loads a <see cref="BitmapSource"/> from a local file path.
+    /// The bitmap is fully decoded and frozen before returning.
+    /// </summary>
+    private static BitmapSource LoadImageFromFile(string path)
+    {
+        var bitmap = new BitmapImage();
+        bitmap.BeginInit();
+        bitmap.UriSource = new Uri(path, UriKind.Absolute);
+        bitmap.CacheOption = BitmapCacheOption.OnLoad;
+        bitmap.EndInit();
+        if (bitmap.CanFreeze)
+        {
+            bitmap.Freeze();
+        }
+
+        return bitmap;
     }
 
     /// <summary>
