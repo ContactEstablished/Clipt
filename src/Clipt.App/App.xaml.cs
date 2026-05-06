@@ -96,7 +96,6 @@ public partial class App : Application
 
         builder.Services.AddSingleton<MainViewModel>();
         builder.Services.AddTransient<PreviewViewModel>();
-        builder.Services.AddTransient<SettingsViewModel>();
         builder.Services.AddSingleton<MainWindow>();
 
         return builder.Build();

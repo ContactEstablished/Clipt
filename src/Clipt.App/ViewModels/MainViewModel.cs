@@ -26,6 +26,14 @@ public sealed partial class MainViewModel : ObservableObject
 
     private int _cachedMaxHistoryItems = 500;
 
+    /// <summary>
+    /// Updates the in-memory history cap after settings are saved (no restart).
+    /// </summary>
+    public void SetCachedMaxHistoryItems(int maxHistoryItems)
+    {
+        _cachedMaxHistoryItems = Math.Max(0, maxHistoryItems);
+    }
+
     public MainViewModel(
         IHistoryService historyService,
         ISearchService searchService,

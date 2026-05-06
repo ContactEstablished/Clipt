@@ -24,4 +24,10 @@ public interface IClipboardMonitor
     /// captured again. Does not restart the Win32 listener.
     /// </summary>
     void ResetDuplicateTracking();
+
+    /// <summary>
+    /// Reloads privacy-related fields from persistent settings into the monitor cache
+    /// so ignore lists take effect without restarting the app.
+    /// </summary>
+    Task RefreshCachedPrivacySettingsAsync(CancellationToken cancellationToken);
 }

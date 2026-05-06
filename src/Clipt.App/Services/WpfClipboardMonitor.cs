@@ -88,6 +88,22 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
         _logger.LogDebug("Duplicate tracking reset after history mutation.");
     }
 
+    public async Task RefreshCachedPrivacySettingsAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        try
+        {
+            var fresh = await _settingsService.GetAsync(cancellationToken);
+            _cachedSettings = fresh.Normalize() with { IsCapturePaused = _isPaused };
+            _logger.LogDebug("Clipboard monitor privacy cache refreshed from settings.");
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception, "Failed to refresh privacy cache; keeping previous cached settings.");
+        }
+    }
+
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

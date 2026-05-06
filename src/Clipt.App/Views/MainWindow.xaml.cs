@@ -34,6 +34,7 @@ public partial class MainWindow : Window
 
     private DateTime _lastSaveTime = DateTime.MinValue;
     private AppSettings _pendingSave = new();
+    private SettingsWindow? _settingsWindow;
 
     public MainWindow(
         MainViewModel viewModel,
@@ -245,9 +246,49 @@ public partial class MainWindow : Window
         await _viewModel.ClearUnpinnedCommand.ExecuteAsync(null);
     }
 
-    private void OnSettingsTrayClick(object sender, RoutedEventArgs e)
+    private async void OnSettingsTrayClick(object sender, RoutedEventArgs e)
     {
-        MessageBox.Show(this, "Settings arrive in Phase 2.", "Clipt", MessageBoxButton.OK, MessageBoxImage.Information);
+        try
+        {
+            if (_settingsWindow is { IsLoaded: true })
+            {
+                _settingsWindow.Activate();
+                return;
+            }
+
+            var vm = new SettingsViewModel(
+                _settingsService,
+                _hotkeyService,
+                _clipboardMonitor,
+                _viewModel,
+                ApplySettingsSnapshot);
+
+            _settingsWindow = new SettingsWindow(vm);
+            _settingsWindow.Owner = this;
+            _settingsWindow.Closed += OnSettingsWindowClosed;
+
+            await _settingsWindow.ReloadAsync(CancellationToken.None);
+            _settingsWindow.Show();
+            _settingsWindow.Activate();
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception, "Failed to open Settings.");
+            MessageBox.Show(this, "Could not open Settings.", "Clipt", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void OnSettingsWindowClosed(object? sender, EventArgs e)
+    {
+        if (sender is SettingsWindow window && ReferenceEquals(window, _settingsWindow))
+        {
+            _settingsWindow = null;
+        }
+    }
+
+    internal void ApplySettingsSnapshot(AppSettings settings)
+    {
+        _pendingSave = settings.Normalize();
     }
 
     private void OnAboutTrayClick(object sender, RoutedEventArgs e)
@@ -473,7 +514,7 @@ public partial class MainWindow : Window
             var width = isValid ? (int)Math.Round(ActualWidth) : (int)Width;
             var height = isValid ? (int)Math.Round(ActualHeight) : (int)Height;
 
-            var settings = new AppSettings
+            var settings = _pendingSave with
             {
                 IsWorkMode = _viewModel.IsWorkMode,
                 IsCapturePaused = _pendingSave.IsCapturePaused,
@@ -484,14 +525,9 @@ public partial class MainWindow : Window
                 Left = left,
                 Top = top,
                 AlwaysOnTop = Topmost,
-                OpenHotkey = _pendingSave.OpenHotkey,
-                Theme = _pendingSave.Theme,
-                AccentColor = _pendingSave.AccentColor,
-                AutoPasteOnEnter = _pendingSave.AutoPasteOnEnter,
-                RestorePreviousClipboardAfterPaste = _pendingSave.RestorePreviousClipboardAfterPaste,
             };
 
-            _pendingSave = settings;
+            _pendingSave = settings.Normalize();
             await _settingsService.SaveAsync(settings, CancellationToken.None);
         }
         catch (Exception exception)

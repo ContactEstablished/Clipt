@@ -1,14 +1,213 @@
 <Window x:Class="Clipt.App.Views.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Clipt Settings"
-        Width="720"
-        Height="520"
-        Background="{DynamicResource Clipt.Brush.Background}">
-    <Grid>
-        <TextBlock HorizontalAlignment="Center"
-                   VerticalAlignment="Center"
-                   Foreground="{DynamicResource Clipt.Brush.TextSecondary}"
-                   Text="Settings arrive in Phase 2." />
+        Title="Settings"
+        Width="640"
+        Height="460"
+        MinWidth="520"
+        MinHeight="380"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        Background="{DynamicResource Clipt.Brush.Background}"
+        FontFamily="{StaticResource Clipt.Font.Ui}"
+        FontSize="13">
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TabControl Grid.Row="0"
+                    Margin="0,0,0,12"
+                    Padding="0"
+                    Background="{DynamicResource Clipt.Brush.Surface}"
+                    BorderBrush="{DynamicResource Clipt.Brush.Border}">
+            <TabControl.Resources>
+                <Style TargetType="TabItem">
+                    <Setter Property="Foreground" Value="{DynamicResource Clipt.Brush.Text}" />
+                    <Setter Property="Padding" Value="12,8" />
+                    <Setter Property="Margin" Value="0,0,4,0" />
+                </Style>
+                <Style TargetType="TabPanel">
+                    <Setter Property="Background" Value="Transparent" />
+                </Style>
+            </TabControl.Resources>
+
+            <TabItem Header="General">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              Padding="14">
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold"
+                                   Margin="0,0,0,10"
+                                   Text="Paste" />
+                        <CheckBox Content="Auto-paste on Enter when another window was focused"
+                                  Foreground="{DynamicResource Clipt.Brush.Text}"
+                                  IsChecked="{Binding AutoPasteOnEnter}" />
+                        <CheckBox Margin="0,10,0,0"
+                                  Content="Restore previous clipboard after paste"
+                                  Foreground="{DynamicResource Clipt.Brush.TextMuted}"
+                                  IsChecked="{Binding RestorePreviousClipboardAfterPaste}"
+                                  IsEnabled="False"
+                                  ToolTip="Coming later." />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="History">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              Padding="14">
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold"
+                                   Margin="0,0,0,10"
+                                   Text="Retention" />
+                        <TextBlock Foreground="{DynamicResource Clipt.Brush.TextSecondary}"
+                                   TextWrapping="Wrap"
+                                   Text="Maximum unpinned items kept when new captures arrive. Pinned items are not pruned." />
+                        <TextBlock Margin="0,14,0,6"
+                                   Foreground="{DynamicResource Clipt.Brush.TextSecondary}"
+                                   Text="Max history items" />
+                        <TextBox Width="160"
+                                 HorizontalAlignment="Left"
+                                 Foreground="{DynamicResource Clipt.Brush.Text}"
+                                 Background="#1C1C20"
+                                 BorderBrush="{DynamicResource Clipt.Brush.Border}"
+                                 BorderThickness="1"
+                                 Padding="8,6"
+                                 CaretBrush="{DynamicResource Clipt.Brush.Accent}"
+                                 Text="{Binding MaxHistoryItemsText, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="Privacy">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              Padding="14">
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold"
+                                   Margin="0,0,0,10"
+                                   Text="Capture filtering" />
+                        <TextBlock Foreground="{DynamicResource Clipt.Brush.TextMuted}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,12"
+                                   Text="One entry per line. Names match the source app title; paths prefix-match. Patterns match title, preview, or body (prefix with regex: for regex)." />
+                        <TextBlock Margin="0,0,0,6"
+                                   Foreground="{DynamicResource Clipt.Brush.TextSecondary}"
+                                   Text="Ignored app names" />
+                        <TextBox AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto"
+                                 MinHeight="72"
+                                 Foreground="{DynamicResource Clipt.Brush.Text}"
+                                 Background="#1C1C20"
+                                 BorderBrush="{DynamicResource Clipt.Brush.Border}"
+                                 BorderThickness="1"
+                                 Padding="8"
+                                 CaretBrush="{DynamicResource Clipt.Brush.Accent}"
+                                 FontFamily="{StaticResource Clipt.Font.Mono}"
+                                 FontSize="12"
+                                 Text="{Binding IgnoredAppNamesText, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Margin="0,12,0,6"
+                                   Foreground="{DynamicResource Clipt.Brush.TextSecondary}"
+                                   Text="Ignored app paths" />
+                        <TextBox AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto"
+                                 MinHeight="72"
+                                 Foreground="{DynamicResource Clipt.Brush.Text}"
+                                 Background="#1C1C20"
+                                 BorderBrush="{DynamicResource Clipt.Brush.Border}"
+                                 BorderThickness="1"
+                                 Padding="8"
+                                 CaretBrush="{DynamicResource Clipt.Brush.Accent}"
+                                 FontFamily="{StaticResource Clipt.Font.Mono}"
+                                 FontSize="12"
+                                 Text="{Binding IgnoredAppPathsText, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Margin="0,12,0,6"
+                                   Foreground="{DynamicResource Clipt.Brush.TextSecondary}"
+                                   Text="Ignored patterns" />
+                        <TextBox AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto"
+                                 MinHeight="72"
+                                 Foreground="{DynamicResource Clipt.Brush.Text}"
+                                 Background="#1C1C20"
+                                 BorderBrush="{DynamicResource Clipt.Brush.Border}"
+                                 BorderThickness="1"
+                                 Padding="8"
+                                 CaretBrush="{DynamicResource Clipt.Brush.Accent}"
+                                 FontFamily="{StaticResource Clipt.Font.Mono}"
+                                 FontSize="12"
+                                 Text="{Binding IgnoredPatternsText, UpdateSourceTrigger=PropertyChanged}" />
+                        <CheckBox Margin="0,14,0,0"
+                                  Content="Honor Clipboard Viewer ignore flag"
+                                  Foreground="{DynamicResource Clipt.Brush.TextMuted}"
+                                  IsChecked="{Binding HonorClipboardViewerIgnore}"
+                                  IsEnabled="False"
+                                  ToolTip="Coming later — not implemented yet." />
+                        <TextBlock Margin="0,16,0,0"
+                                   Foreground="{DynamicResource Clipt.Brush.TextMuted}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Text="Saved privacy lists apply immediately after Save." />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="Hotkey">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              Padding="14">
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold"
+                                   Margin="0,0,0,10"
+                                   Text="Global shortcut" />
+                        <TextBlock Foreground="{DynamicResource Clipt.Brush.TextSecondary}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,10"
+                                   Text="Example: Ctrl+Shift+V. Uses modifiers (Ctrl, Alt, Shift, Win) plus one key name recognized by WPF." />
+                        <TextBox MinHeight="36"
+                                 VerticalContentAlignment="Center"
+                                 Foreground="{DynamicResource Clipt.Brush.Text}"
+                                 Background="#1C1C20"
+                                 BorderBrush="{DynamicResource Clipt.Brush.Border}"
+                                 BorderThickness="1"
+                                 Padding="10,6"
+                                 CaretBrush="{DynamicResource Clipt.Brush.Accent}"
+                                 FontFamily="{StaticResource Clipt.Font.Mono}"
+                                 Text="{Binding OpenHotkeyText, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="Appearance">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              Padding="14">
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold"
+                                   Margin="0,0,0,10"
+                                   Text="Window opacity" />
+                        <TextBlock Foreground="{DynamicResource Clipt.Brush.TextSecondary}"
+                                   TextWrapping="Wrap"
+                                   Text="Adjust opacity from the slider on the main Clipt title bar to avoid conflicting controls." />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+
+        <StackPanel Grid.Row="1"
+                    HorizontalAlignment="Right"
+                    Orientation="Horizontal">
+            <Button Margin="0,0,10,0"
+                    MinWidth="92"
+                    Content="Save"
+                    Command="{Binding SaveCommand}" />
+            <Button MinWidth="92"
+                    Content="Cancel"
+                    Command="{Binding CancelCommand}" />
+        </StackPanel>
     </Grid>
 </Window>
