@@ -95,6 +95,31 @@ public static class FilePathDisplayHelper
         return HasExtension(path) ? "File" : "Folder";
     }
 
+    /// <summary>
+    /// Converts a file URI string (e.g. "file:///C:/path/file.png") or a rooted path
+    /// to a local filesystem path. Returns null when the input is null, empty, or not
+    /// a valid absolute file URI / rooted path.
+    /// </summary>
+    public static string? ConvertFileUriToLocalPath(string? uri)
+    {
+        if (string.IsNullOrWhiteSpace(uri))
+        {
+            return null;
+        }
+
+        if (Uri.TryCreate(uri, UriKind.Absolute, out var parsed) && parsed.IsFile)
+        {
+            return parsed.LocalPath;
+        }
+
+        if (Path.IsPathRooted(uri))
+        {
+            return uri;
+        }
+
+        return null;
+    }
+
     public static bool Exists(string path)
     {
         if (string.IsNullOrWhiteSpace(path))

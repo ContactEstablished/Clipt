@@ -291,4 +291,61 @@ public sealed class FilePathDisplayHelperTests : IDisposable
     {
         FilePathDisplayHelper.GetExplorerArgument(path!).Should().BeEmpty();
     }
+
+    // ConvertFileUriToLocalPath
+
+    [Fact]
+    public void ConvertFileUriToLocalPath_ValidFileUri_ReturnsLocalPath()
+    {
+        var localPath = @"C:\Users\Test\image.png";
+        var uri = new Uri(localPath).AbsoluteUri;
+
+        var result = FilePathDisplayHelper.ConvertFileUriToLocalPath(uri);
+
+        result.Should().Be(localPath);
+    }
+
+    [Fact]
+    public void ConvertFileUriToLocalPath_RootedPath_ReturnsSamePath()
+    {
+        var path = @"C:\preview-cache\img_abc123.png";
+
+        var result = FilePathDisplayHelper.ConvertFileUriToLocalPath(path);
+
+        result.Should().Be(path);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void ConvertFileUriToLocalPath_NullOrWhitespace_ReturnsNull(string? uri)
+    {
+        FilePathDisplayHelper.ConvertFileUriToLocalPath(uri).Should().BeNull();
+    }
+
+    [Fact]
+    public void ConvertFileUriToLocalPath_NonFileUri_ReturnsNull()
+    {
+        FilePathDisplayHelper.ConvertFileUriToLocalPath("https://example.com/image.png")
+            .Should().BeNull();
+    }
+
+    [Fact]
+    public void ConvertFileUriToLocalPath_RelativePath_ReturnsNull()
+    {
+        FilePathDisplayHelper.ConvertFileUriToLocalPath("preview-cache/img.png")
+            .Should().BeNull();
+    }
+
+    [Fact]
+    public void ConvertFileUriToLocalPath_FileUriWithSpaces_DecodesLocalPath()
+    {
+        var localPath = @"C:\My Folder\image file.png";
+        var uri = new Uri(localPath).AbsoluteUri;
+
+        var result = FilePathDisplayHelper.ConvertFileUriToLocalPath(uri);
+
+        result.Should().Be(localPath);
+    }
 }

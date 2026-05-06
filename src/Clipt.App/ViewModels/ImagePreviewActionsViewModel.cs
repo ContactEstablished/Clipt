@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Clipt.App.Helpers;
@@ -10,41 +11,31 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Clipt.App.ViewModels;
 
-public sealed partial class FilePathPreviewViewModel : ObservableObject
+public sealed partial class ImagePreviewActionsViewModel : ObservableObject
 {
-    private static readonly ILogger _logger = NullLoggerFactory.Instance.CreateLogger(nameof(FilePathPreviewViewModel));
+    private static readonly ILogger _logger =
+        NullLoggerFactory.Instance.CreateLogger(nameof(ImagePreviewActionsViewModel));
 
     private readonly SemaphoreSlim _copyLock = new(1, 1);
     private readonly SemaphoreSlim _revealLock = new(1, 1);
 
-    public FilePathPreviewViewModel(string fullPath)
+    public ImagePreviewActionsViewModel(string? imageUri)
     {
-        FullPath = fullPath;
-        Name = FilePathDisplayHelper.GetFileName(fullPath);
-        ParentPath = FilePathDisplayHelper.GetParentPath(fullPath);
-        ExtensionLabel = FilePathDisplayHelper.GetExtensionLabel(fullPath);
-        KindLabel = FilePathDisplayHelper.GetKindLabel(fullPath);
-        Exists = FilePathDisplayHelper.Exists(fullPath);
-        StatusLabel = Exists ? "Available" : "Missing";
+        ImagePreviewLocalPath = FilePathDisplayHelper.ConvertFileUriToLocalPath(imageUri);
+        HasPreviewPath = ImagePreviewLocalPath is not null && File.Exists(ImagePreviewLocalPath);
+        StatusLabel = HasPreviewPath ? "Cached" : "Missing";
     }
 
-    public string FullPath { get; }
-    public string Name { get; }
-    public string ParentPath { get; }
-    public string ExtensionLabel { get; }
-    public string KindLabel { get; }
-    public string KindGlyph => KindLabel == "File" ? "Fi" : "Fo";
-    public bool Exists { get; }
+    public string? ImagePreviewLocalPath { get; }
+    public bool HasPreviewPath { get; }
 
     [ObservableProperty]
-    private string _statusLabel;
-
-    public bool IsMissing => !Exists;
+    private string _statusLabel = "Missing";
 
     [RelayCommand]
-    private async Task CopyPathAsync()
+    private async Task CopyImagePreviewPathAsync()
     {
-        if (string.IsNullOrEmpty(FullPath))
+        if (string.IsNullOrEmpty(ImagePreviewLocalPath))
         {
             return;
         }
@@ -52,7 +43,8 @@ public sealed partial class FilePathPreviewViewModel : ObservableObject
         await _copyLock.WaitAsync();
         try
         {
-            await ClipboardCopyHelper.CopyTextWithRetryAsync(FullPath, "file path");
+            await ClipboardCopyHelper.CopyTextWithRetryAsync(
+                ImagePreviewLocalPath, "image preview path");
             var original = StatusLabel;
             StatusLabel = "Copied";
             await Task.Delay(1200);
@@ -65,14 +57,14 @@ public sealed partial class FilePathPreviewViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task RevealInExplorerAsync()
+    private async Task RevealImagePreviewAsync()
     {
-        if (!Exists)
+        if (!HasPreviewPath || string.IsNullOrEmpty(ImagePreviewLocalPath))
         {
             return;
         }
 
-        var explorerArg = FilePathDisplayHelper.GetExplorerArgument(FullPath);
+        var explorerArg = FilePathDisplayHelper.GetExplorerArgument(ImagePreviewLocalPath);
         if (string.IsNullOrEmpty(explorerArg))
         {
             return;
@@ -94,7 +86,7 @@ public sealed partial class FilePathPreviewViewModel : ObservableObject
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to reveal path in Explorer.");
+                _logger.LogError(ex, "Failed to reveal image preview in Explorer.");
                 StatusLabel = "Failed";
             }
 
@@ -106,5 +98,4 @@ public sealed partial class FilePathPreviewViewModel : ObservableObject
             _revealLock.Release();
         }
     }
-
 }
