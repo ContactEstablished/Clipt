@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Collections.Specialized;
 using Clipt.Core.Models;
 using Clipt.Core.Services;
 using Microsoft.Extensions.Logging;
@@ -191,6 +192,13 @@ public sealed class WpfClipboardWriter(ILogger<WpfClipboardWriter> logger) : ICl
                 var ansiText = FindFormatText(item, DataFormats.Text);
                 if (ansiText is not null)
                     dataObject.SetData(DataFormats.Text, ansiText);
+
+                if (item.ContentType == ContentType.File && item.FilePaths.Count > 0)
+                {
+                    var fileDropList = new StringCollection();
+                    fileDropList.AddRange(item.FilePaths.ToArray());
+                    dataObject.SetFileDropList(fileDropList);
+                }
 
                 Clipboard.SetDataObject(dataObject, copy: true);
             }

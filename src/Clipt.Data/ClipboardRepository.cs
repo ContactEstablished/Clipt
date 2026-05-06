@@ -67,7 +67,7 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
                 {
                     if (formatsMap.TryGetValue(items[i].Id.ToString(), out var formats))
                     {
-                        items[i] = items[i] with { Formats = formats };
+                        items[i] = ApplyFormats(items[i], formats);
                     }
                 }
             }
@@ -142,7 +142,7 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
                 {
                     if (formatsMap.TryGetValue(items[i].Id.ToString(), out var formats))
                     {
-                        items[i] = items[i] with { Formats = formats };
+                        items[i] = ApplyFormats(items[i], formats);
                     }
                 }
             }
@@ -198,7 +198,7 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
                 await checkReader.DisposeAsync();
 
                 var formats = await LoadFormatsForSingleItemAsync(connection, existingItem.Id, cancellationToken);
-                existingItem = existingItem with { Formats = formats };
+                existingItem = ApplyFormats(existingItem, formats);
 
                 var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                 using var updateCommand = connection.CreateCommand();
@@ -285,8 +285,9 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
             // Persist captured clipboard formats alongside the item row.
             await InsertFormatsAsync(connection, item, cancellationToken);
 
+            var savedItem = ApplyFormats(item, item.Formats);
             _logger.LogDebug("Inserted clipboard item {Id} with hash {Hash} and {FormatCount} formats.", item.Id, item.ContentHash, item.Formats.Count);
-            return item;
+            return savedItem;
         }
         finally
         {
@@ -599,6 +600,33 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
         }
 
         return formats;
+    }
+
+    private static ClipboardItem ApplyFormats(ClipboardItem item, IReadOnlyList<ClipboardFormat> formats)
+    {
+        var filePaths = ExtractFilePaths(formats);
+        return item with
+        {
+            Formats = formats,
+            FilePaths = filePaths.Count > 0 ? filePaths : item.FilePaths,
+        };
+    }
+
+    private static IReadOnlyList<string> ExtractFilePaths(IReadOnlyList<ClipboardFormat> formats)
+    {
+        var fileDrop = formats.FirstOrDefault(f =>
+            string.Equals(f.Name, ClipboardFormatNames.FileDrop, StringComparison.OrdinalIgnoreCase));
+
+        if (string.IsNullOrWhiteSpace(fileDrop?.TextPayload))
+        {
+            return [];
+        }
+
+        return fileDrop.TextPayload
+            .Split(["\r\n", "\n", "\r"], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     /// <summary>

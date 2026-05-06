@@ -583,6 +583,66 @@ public sealed class ClipboardRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task SaveAsync_FileDrop_ReturnsFilePathsFromFormatPayload()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var paths = new[]
+        {
+            @"C:\Users\Matt\Documents\phase-one-notes.md",
+            @"C:\Users\Matt\Pictures\clipt-mockup.png",
+        };
+
+        var item = CreateFileDropItem(paths);
+
+        var saved = await _repository.SaveAsync(item, CancellationToken.None);
+
+        saved.ContentType.Should().Be(ContentType.File);
+        saved.FilePaths.Should().Equal(paths);
+        saved.Formats.Should().Contain(f => f.Name == ClipboardFormatNames.FileDrop);
+    }
+
+    [Fact]
+    public async Task GetItemsAsync_FileDrop_RehydratesFilePaths()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var paths = new[]
+        {
+            @"C:\Users\Matt\Documents\phase-one-notes.md",
+            @"C:\Users\Matt\Pictures\clipt-mockup.png",
+        };
+
+        await _repository.SaveAsync(CreateFileDropItem(paths), CancellationToken.None);
+
+        var items = await _repository.GetItemsAsync(CancellationToken.None);
+
+        items.Should().ContainSingle();
+        items[0].ContentType.Should().Be(ContentType.File);
+        items[0].FilePaths.Should().Equal(paths);
+    }
+
+    [Fact]
+    public async Task SearchAsync_FileDrop_ReturnsRehydratedFilePaths()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var paths = new[]
+        {
+            @"C:\Users\Matt\Documents\phase-one-notes.md",
+            @"C:\Users\Matt\Pictures\clipt-mockup.png",
+        };
+
+        await _repository.SaveAsync(CreateFileDropItem(paths), CancellationToken.None);
+
+        var results = await _repository.SearchAsync("mockup", CancellationToken.None);
+
+        results.Should().ContainSingle();
+        results[0].ContentType.Should().Be(ContentType.File);
+        results[0].FilePaths.Should().Equal(paths);
+    }
+
+    [Fact]
     public async Task DeleteAsync_DeletesAssociatedFormats()
     {
         await _migrationRunner.RunAsync(CancellationToken.None);
@@ -986,5 +1046,25 @@ public sealed class ClipboardRepositoryTests : IAsyncDisposable
             ? formats.Select(f => new ClipboardFormat(f.Name, f.Text)).ToList()
             : [];
         return item with { Formats = formatList };
+    }
+
+    private static ClipboardItem CreateFileDropItem(IReadOnlyList<string> paths)
+    {
+        var content = string.Join(Environment.NewLine, paths);
+        var item = CreateTestItem(
+            content,
+            contentType: ContentType.File,
+            preview: paths.Count == 1 ? paths[0] : $"{paths.Count} files and folders");
+
+        return item with
+        {
+            Title = paths.Count == 1 ? Path.GetFileName(paths[0]) : $"{paths.Count} files",
+            FilePaths = paths,
+            Formats =
+            [
+                new ClipboardFormat(ClipboardFormatNames.FileDrop, content),
+                new ClipboardFormat(ClipboardFormatNames.UnicodeText, content),
+            ],
+        };
     }
 }

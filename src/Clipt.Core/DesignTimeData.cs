@@ -351,10 +351,24 @@ public static class DesignTimeData
             ByteSize = content.Length * sizeof(char),
             LastUsedAt = createdAt,
             UseCount = 0,
-            Formats =
-            [
-                new ClipboardFormat("CF_UNICODETEXT", content),
-            ],
+            Formats = CreateFormats(content, filePaths),
         };
+    }
+
+    private static IReadOnlyList<ClipboardFormat> CreateFormats(string content, IReadOnlyList<string>? filePaths)
+    {
+        var formats = new List<ClipboardFormat>
+        {
+            new(ClipboardFormatNames.UnicodeText, content),
+        };
+
+        if (filePaths is { Count: > 0 })
+        {
+            formats.Insert(0, new ClipboardFormat(
+                ClipboardFormatNames.FileDrop,
+                string.Join(Environment.NewLine, filePaths)));
+        }
+
+        return formats;
     }
 }

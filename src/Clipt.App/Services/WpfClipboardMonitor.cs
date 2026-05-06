@@ -1,3 +1,4 @@
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
@@ -10,7 +11,7 @@ using Microsoft.Extensions.Logging;
 namespace Clipt.App.Services;
 
 /// <summary>
-/// Monitors the system clipboard for text changes and emits
+/// Monitors the system clipboard for supported content changes and emits
 /// <see cref="ClipboardItemCaptured"/> events. Uses Win32 clipboard
 /// format listener messages for reliable detection.
 ///
@@ -27,7 +28,7 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
     private readonly ILogger<WpfClipboardMonitor> _logger;
 
     private HwndSource? _messageSource;
-    private string? _lastTextHash;
+    private string? _lastContentHash;
 
     // History deletion invalidates in-memory duplicate tracking because
     // a previously-captured hash may no longer exist in the database.
@@ -84,7 +85,7 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
 
     public void ResetDuplicateTracking()
     {
-        _lastTextHash = null;
+        _lastContentHash = null;
         _logger.LogDebug("Duplicate tracking reset after history mutation.");
     }
 
@@ -186,11 +187,11 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
 
         _logger.LogDebug("Clipboard update message received.");
         handled = true;
-        CaptureCurrentTextClipboardItem();
+        CaptureCurrentClipboardItem();
         return 0;
     }
 
-    private void CaptureCurrentTextClipboardItem()
+    private void CaptureCurrentClipboardItem()
     {
         if (_isPaused)
         {
@@ -200,9 +201,14 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
 
         try
         {
+            if (TryCaptureFileDropClipboardItem())
+            {
+                return;
+            }
+
             if (!Clipboard.ContainsText())
             {
-                _logger.LogDebug("Clipboard update ignored: no text on clipboard.");
+                _logger.LogDebug("Clipboard update ignored: no supported clipboard content.");
                 return;
             }
 
@@ -214,7 +220,7 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
             }
 
             var hash = ClipboardContentHasher.ComputeHash(text);
-            if (hash == _lastTextHash)
+            if (hash == _lastContentHash)
             {
                 _logger.LogDebug("Clipboard update ignored: duplicate hash {Hash}.", hash);
                 return;
@@ -230,7 +236,7 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
                 return;
             }
 
-            _lastTextHash = hash;
+            _lastContentHash = hash;
             _logger.LogDebug("Clipboard item captured: '{Title}' (hash {Hash}).", item.Title, hash);
             ClipboardItemCaptured?.Invoke(this, item);
         }
@@ -241,6 +247,72 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
         catch (InvalidOperationException exception)
         {
             _logger.LogDebug(exception, "Clipboard text capture failed.");
+        }
+    }
+
+    private bool TryCaptureFileDropClipboardItem()
+    {
+        try
+        {
+            if (!Clipboard.ContainsFileDropList())
+            {
+                return false;
+            }
+
+            var fileDropList = Clipboard.GetFileDropList();
+            var paths = fileDropList
+                .Cast<string>()
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (paths.Count == 0)
+            {
+                _logger.LogDebug("Clipboard file drop ignored: no usable paths.");
+                return true;
+            }
+
+            var content = string.Join(Environment.NewLine, paths);
+            var hash = ClipboardContentHasher.ComputeHash(content);
+            if (hash == _lastContentHash)
+            {
+                _logger.LogDebug("Clipboard file drop ignored: duplicate hash {Hash}.", hash);
+                return true;
+            }
+
+            var formats = new List<ClipboardFormat>
+            {
+                new(ClipboardFormatNames.FileDrop, content),
+                new(ClipboardFormatNames.UnicodeText, content),
+            };
+
+            var item = CreateFileDropItem(paths, content, formats);
+            if (!_privacyFilter.ShouldCapture(item, _cachedSettings))
+            {
+                _logger.LogDebug(
+                    "Clipboard file drop from '{SourceApp}' blocked by privacy filter.",
+                    item.SourceAppName);
+                return true;
+            }
+
+            _lastContentHash = hash;
+            _logger.LogDebug(
+                "Clipboard file drop captured: '{Title}' ({PathCount} paths, hash {Hash}).",
+                item.Title,
+                paths.Count,
+                hash);
+            ClipboardItemCaptured?.Invoke(this, item);
+            return true;
+        }
+        catch (ExternalException exception)
+        {
+            _logger.LogDebug(exception, "Clipboard was temporarily unavailable during file drop capture.");
+            return true;
+        }
+        catch (InvalidOperationException exception)
+        {
+            _logger.LogDebug(exception, "Clipboard file drop capture failed.");
+            return true;
         }
     }
 
@@ -279,6 +351,37 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
         };
     }
 
+    private ClipboardItem CreateFileDropItem(
+        IReadOnlyList<string> paths,
+        string content,
+        IReadOnlyList<ClipboardFormat> formats)
+    {
+        var source = _sourceAppResolver.Resolve();
+        var now = DateTimeOffset.Now;
+        var title = CreateFileDropTitle(paths);
+        var preview = paths.Count == 1
+            ? paths[0]
+            : $"{paths.Count} files and folders";
+
+        return new ClipboardItem
+        {
+            Id = Guid.NewGuid(),
+            ContentHash = ClipboardContentHasher.ComputeHash(content),
+            Title = title,
+            PreviewText = preview,
+            Content = content,
+            ContentType = ContentType.File,
+            SourceAppName = source.Name,
+            SourceAppPath = source.Path,
+            CreatedAt = now,
+            ByteSize = Encoding.UTF8.GetByteCount(content),
+            LastUsedAt = now,
+            UseCount = 0,
+            FilePaths = paths,
+            Formats = formats,
+        };
+    }
+
     private static string CreateTitle(string text, ContentType contentType)
     {
         var firstLine = text
@@ -292,6 +395,17 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
         }
 
         return firstLine.Length <= 64 ? firstLine : string.Concat(firstLine.AsSpan(0, 61), "...");
+    }
+
+    private static string CreateFileDropTitle(IReadOnlyList<string> paths)
+    {
+        if (paths.Count == 1)
+        {
+            var name = Path.GetFileName(paths[0].TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            return string.IsNullOrWhiteSpace(name) ? paths[0] : name;
+        }
+
+        return $"{paths.Count} files";
     }
 
     /// <summary>

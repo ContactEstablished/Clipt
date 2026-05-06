@@ -15,8 +15,7 @@ public sealed record ClipboardWriteOptions
 public enum PasteMode
 {
     /// <summary>
-    /// Use the best available format from the clipboard item (currently
-    /// Unicode text for all types).
+    /// Use the best available format from the clipboard item.
     /// </summary>
     Auto,
 
