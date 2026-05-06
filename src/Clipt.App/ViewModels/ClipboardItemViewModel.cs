@@ -1,3 +1,4 @@
+using System.Linq;
 using Clipt.Core.Models;
 
 namespace Clipt.App.ViewModels;
@@ -29,4 +30,9 @@ public sealed class ClipboardItemViewModel(ClipboardItem model)
     public IReadOnlyList<string> FilePaths => Model.FilePaths;
 
     public string GroupName => IsPinned ? "Pinned" : "Recent";
+
+    public IReadOnlyList<ClipboardFormatBadgeViewModel> AvailableFormats { get; } =
+        model.Formats.Select(f => new ClipboardFormatBadgeViewModel(f)).ToList();
+
+    public bool HasAvailableFormats => AvailableFormats.Count > 0;
 }

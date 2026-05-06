@@ -13,6 +13,7 @@
     <Grid Margin="18,16,18,18">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -41,7 +42,35 @@
                        Visibility="{Binding IsPinned, Converter={StaticResource BoolToVisibilityConverter}}" />
         </DockPanel>
 
-        <Grid Grid.Row="1" Margin="0,16,0,16">
+        <ItemsControl Grid.Row="1"
+                      Margin="0,12,0,0"
+                      ItemsSource="{Binding AvailableFormats}"
+                      Visibility="{Binding HasAvailableFormats, Converter={StaticResource BoolToVisibilityConverter}}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Margin="0,0,6,6"
+                            Padding="7,4"
+                            Background="{DynamicResource Clipt.Brush.SurfaceAlt}"
+                            BorderBrush="{DynamicResource Clipt.Brush.Border}"
+                            BorderThickness="1"
+                            CornerRadius="5">
+                        <TextBlock FontSize="11"
+                                   Foreground="{DynamicResource Clipt.Brush.TextSecondary}">
+                            <Run Text="{Binding DisplayName, Mode=OneTime}" />
+                            <Run Text=" · " Foreground="{DynamicResource Clipt.Brush.TextMuted}" />
+                            <Run Text="{Binding SizeLabel, Mode=OneTime}" Foreground="{DynamicResource Clipt.Brush.TextMuted}" />
+                        </TextBlock>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <Grid Grid.Row="2" Margin="0,16,0,16">
             <controls:MarkdownPreviewControl Markdown="{Binding Content}"
                                              Visibility="{Binding ContentType, Converter={StaticResource ContentTypeVisibilityConverter}, ConverterParameter=Markdown}" />
 
@@ -119,7 +148,7 @@
             </Border>
         </Grid>
 
-        <DockPanel Grid.Row="2" LastChildFill="False">
+        <DockPanel Grid.Row="3" LastChildFill="False">
             <Button Margin="0,0,8,0" Content="Paste · Enter" />
             <Button Content="Copy · Shift+Enter" />
         </DockPanel>
