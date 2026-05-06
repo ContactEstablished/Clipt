@@ -213,4 +213,82 @@ public sealed class FilePathDisplayHelperTests : IDisposable
     {
         FilePathDisplayHelper.GetKindLabel(@"C:\nonexistent\folder").Should().Be("Folder");
     }
+
+    // IsDirectoryPath
+
+    [Fact]
+    public void IsDirectoryPath_ExistingFile_ReturnsFalse()
+    {
+        FilePathDisplayHelper.IsDirectoryPath(_tempFile).Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsDirectoryPath_ExistingDirectory_ReturnsTrue()
+    {
+        FilePathDisplayHelper.IsDirectoryPath(_tempDir).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(@"C:\nonexistent\folder")]
+    [InlineData(@"C:\nonexistent\noext")]
+    public void IsDirectoryPath_NonexistentNoExtension_ReturnsTrue(string path)
+    {
+        FilePathDisplayHelper.IsDirectoryPath(path).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(@"C:\nonexistent\file.txt")]
+    [InlineData(@"C:\nonexistent\archive.tar.gz")]
+    public void IsDirectoryPath_NonexistentWithExtension_ReturnsFalse(string path)
+    {
+        FilePathDisplayHelper.IsDirectoryPath(path).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void IsDirectoryPath_NullOrWhitespace_ReturnsFalse(string? path)
+    {
+        FilePathDisplayHelper.IsDirectoryPath(path!).Should().BeFalse();
+    }
+
+    // GetExplorerArgument
+
+    [Fact]
+    public void GetExplorerArgument_ExistingFile_ReturnsSelectArgument()
+    {
+        var result = FilePathDisplayHelper.GetExplorerArgument(_tempFile);
+        result.Should().Be($"/select,\"{_tempFile}\"");
+    }
+
+    [Fact]
+    public void GetExplorerArgument_ExistingDirectory_ReturnsQuotedPath()
+    {
+        var result = FilePathDisplayHelper.GetExplorerArgument(_tempDir);
+        result.Should().Be($"\"{_tempDir}\"");
+    }
+
+    [Fact]
+    public void GetExplorerArgument_NonexistentPath_ReturnsEmpty()
+    {
+        FilePathDisplayHelper.GetExplorerArgument(@"C:\does-not-exist-at-all-12345.txt")
+            .Should().BeEmpty();
+    }
+
+    [Fact]
+    public void GetExplorerArgument_NonexistentDirectory_ReturnsEmpty()
+    {
+        FilePathDisplayHelper.GetExplorerArgument(@"C:\does-not-exist-folder-99999")
+            .Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void GetExplorerArgument_NullOrWhitespace_ReturnsEmpty(string? path)
+    {
+        FilePathDisplayHelper.GetExplorerArgument(path!).Should().BeEmpty();
+    }
 }

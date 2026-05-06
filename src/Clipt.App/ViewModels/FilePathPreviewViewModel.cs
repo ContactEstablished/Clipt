@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,6 +19,7 @@ public sealed partial class FilePathPreviewViewModel : ObservableObject
     private static readonly int[] CopyRetryBackoffMs = [25, 75, 200, 500];
 
     private readonly SemaphoreSlim _copyLock = new(1, 1);
+    private readonly SemaphoreSlim _revealLock = new(1, 1);
 
     public FilePathPreviewViewModel(string fullPath)
     {
@@ -63,6 +65,49 @@ public sealed partial class FilePathPreviewViewModel : ObservableObject
         finally
         {
             _copyLock.Release();
+        }
+    }
+
+    [RelayCommand]
+    private async Task RevealInExplorerAsync()
+    {
+        if (!Exists)
+        {
+            return;
+        }
+
+        var explorerArg = FilePathDisplayHelper.GetExplorerArgument(FullPath);
+        if (string.IsNullOrEmpty(explorerArg))
+        {
+            return;
+        }
+
+        await _revealLock.WaitAsync();
+        try
+        {
+            var original = StatusLabel;
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    Arguments = explorerArg,
+                    UseShellExecute = true,
+                });
+                StatusLabel = "Opened";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to reveal path in Explorer.");
+                StatusLabel = "Failed";
+            }
+
+            await Task.Delay(1200);
+            StatusLabel = original;
+        }
+        finally
+        {
+            _revealLock.Release();
         }
     }
 

@@ -149,6 +149,7 @@
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
 
                                         <Border Grid.Column="0"
@@ -223,6 +224,33 @@
                                                   StrokeThickness="1.8"
                                                   Stretch="Uniform"
                                                   Style="{StaticResource CopyPathIconStyle}" />
+                                        </Button>
+
+                                        <Button Grid.Column="4"
+                                                Width="28"
+                                                Height="28"
+                                                Margin="6,0,0,0"
+                                                Style="{StaticResource IconButtonStyle}"
+                                                ToolTip="Reveal in Explorer"
+                                                Command="{Binding RevealInExplorerCommand}"
+                                                IsEnabled="{Binding Exists}">
+                                            <Button.Resources>
+                                                <Style x:Key="RevealIconStyle" TargetType="Path">
+                                                    <Setter Property="Stroke" Value="{DynamicResource Clipt.Brush.TextMuted}" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=IsMouseOver}" Value="True">
+                                                            <Setter Property="Stroke" Value="{DynamicResource Clipt.Brush.Accent}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Resources>
+                                            <Path Width="14"
+                                                  Height="14"
+                                                  Data="M1 4h4l1.5 1.5H15a1 1 0 0 1 1 1V13a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4z"
+                                                  StrokeLineJoin="Round"
+                                                  StrokeThickness="1.8"
+                                                  Stretch="Uniform"
+                                                  Style="{StaticResource RevealIconStyle}" />
                                         </Button>
                                     </Grid>
                                 </Border>

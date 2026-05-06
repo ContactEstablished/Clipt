@@ -105,6 +105,60 @@ public static class FilePathDisplayHelper
         return File.Exists(path) || Directory.Exists(path);
     }
 
+    /// <summary>
+    /// Returns true when <paramref name="path"/> resolves to a directory.
+    /// For paths that do not exist on disk the result is inferred: no
+    /// extension => directory, has extension => file.
+    /// </summary>
+    public static bool IsDirectoryPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        if (Directory.Exists(path))
+        {
+            return true;
+        }
+
+        if (File.Exists(path))
+        {
+            return false;
+        }
+
+        return !HasExtension(path);
+    }
+
+    /// <summary>
+    /// Returns the argument string to pass to explorer.exe in order to reveal
+    /// <paramref name="path"/>:
+    /// <list type="bullet">
+    ///   <item>Existing file  → <c>/select,"&lt;path&gt;"</c></item>
+    ///   <item>Existing dir   → <c>"&lt;path&gt;"</c></item>
+    ///   <item>Missing / blank → empty string (caller should not launch)</item>
+    /// </list>
+    /// </summary>
+    public static string GetExplorerArgument(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return string.Empty;
+        }
+
+        if (File.Exists(path))
+        {
+            return $"/select,\"{path}\"";
+        }
+
+        if (Directory.Exists(path))
+        {
+            return $"\"{path}\"";
+        }
+
+        return string.Empty;
+    }
+
     public static string FormatCountSummary(IReadOnlyList<string>? paths)
     {
         if (paths is null || paths.Count == 0)
