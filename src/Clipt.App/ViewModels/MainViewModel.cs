@@ -270,6 +270,19 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Exits demo fallback mode and reloads the item list from the database.
+    /// Call this after demo content has been seeded into the database so the
+    /// main window shows real persisted rows instead of in-memory samples.
+    /// </summary>
+    public async Task RefreshFromDatabaseAsync()
+    {
+        _isDemoFallback = false;
+        _demoItems.Clear();
+        await RefreshItemsAsync();
+        SelectedItem = Items.FirstOrDefault();
+    }
+
     private async Task RefreshItemsAsync()
     {
         if (_isDemoFallback)

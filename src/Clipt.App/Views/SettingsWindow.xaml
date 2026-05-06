@@ -23,10 +23,44 @@
                     Background="{DynamicResource Clipt.Brush.Surface}"
                     BorderBrush="{DynamicResource Clipt.Brush.Border}">
             <TabControl.Resources>
-                <Style TargetType="TabItem">
+                <Style TargetType="{x:Type TabItem}">
                     <Setter Property="Foreground" Value="{DynamicResource Clipt.Brush.Text}" />
-                    <Setter Property="Padding" Value="12,8" />
+                    <Setter Property="FontFamily" Value="{StaticResource Clipt.Font.Ui}" />
+                    <Setter Property="FontSize" Value="13" />
+                    <Setter Property="Padding" Value="14,8" />
                     <Setter Property="Margin" Value="0,0,4,0" />
+                    <Setter Property="MinHeight" Value="34" />
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="{x:Type TabItem}">
+                                <Border x:Name="TabBorder"
+                                        Background="{DynamicResource Clipt.Brush.SurfaceAlt}"
+                                        BorderBrush="{DynamicResource Clipt.Brush.Border}"
+                                        BorderThickness="1,1,1,0"
+                                        CornerRadius="6,6,0,0"
+                                        Padding="{TemplateBinding Padding}"
+                                        SnapsToDevicePixels="True">
+                                    <ContentPresenter ContentSource="Header"
+                                                      HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"
+                                                      RecognizesAccessKey="True" />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="TabBorder" Property="Background" Value="{DynamicResource Clipt.Brush.AccentSoft}" />
+                                    </Trigger>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter Property="Foreground" Value="{DynamicResource Clipt.Brush.Text}" />
+                                        <Setter TargetName="TabBorder" Property="Background" Value="{DynamicResource Clipt.Brush.Surface}" />
+                                        <Setter TargetName="TabBorder" Property="BorderBrush" Value="{DynamicResource Clipt.Brush.Accent}" />
+                                    </Trigger>
+                                    <Trigger Property="IsEnabled" Value="False">
+                                        <Setter Property="Foreground" Value="{DynamicResource Clipt.Brush.TextMuted}" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
                 </Style>
                 <Style TargetType="TabPanel">
                     <Setter Property="Background" Value="Transparent" />
@@ -193,6 +227,21 @@
                         <TextBlock Foreground="{DynamicResource Clipt.Brush.TextSecondary}"
                                    TextWrapping="Wrap"
                                    Text="Adjust opacity from the slider on the main Clipt title bar to avoid conflicting controls." />
+
+                        <Separator Margin="0,20,0,18" />
+
+                        <TextBlock FontWeight="SemiBold"
+                                   Margin="0,0,0,8"
+                                   Text="Showroom" />
+                        <TextBlock Foreground="{DynamicResource Clipt.Brush.TextSecondary}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,12"
+                                   Text="Adds curated sample clips for screenshots and testing. Existing items are not affected." />
+                        <Button Content="Load demo content"
+                                HorizontalAlignment="Left"
+                                MinWidth="160"
+                                Padding="16,8"
+                                Command="{Binding LoadDemoContentCommand}" />
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

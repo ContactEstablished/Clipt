@@ -13,10 +13,10 @@ public sealed class SearchServiceTests
         var service = new SearchService();
         var items = DesignTimeData.GetSampleItems();
 
-        var results = service.Filter(items, "FTS5");
+        var results = service.Filter(items, "dashboard");
 
         results.Should().ContainSingle();
-        results[0].Title.Should().Be("SQL search prototype");
+        results[0].Title.Should().Be("Dashboard query");
     }
 
     [Fact]

@@ -19,6 +19,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     private readonly IClipboardMonitor _clipboardMonitor;
     private readonly MainViewModel _mainViewModel;
     private readonly Action<AppSettings> _applySettingsToShell;
+    private readonly DemoContentSeeder _demoContentSeeder;
 
     private AppSettings _baseline = new();
 
@@ -27,13 +28,15 @@ public sealed partial class SettingsViewModel : ObservableObject
         IHotkeyService hotkeyService,
         IClipboardMonitor clipboardMonitor,
         MainViewModel mainViewModel,
-        Action<AppSettings> applySettingsToShell)
+        Action<AppSettings> applySettingsToShell,
+        DemoContentSeeder demoContentSeeder)
     {
         _settingsService = settingsService;
         _hotkeyService = hotkeyService;
         _clipboardMonitor = clipboardMonitor;
         _mainViewModel = mainViewModel;
         _applySettingsToShell = applySettingsToShell;
+        _demoContentSeeder = demoContentSeeder;
     }
 
     public event EventHandler? CloseRequested;
@@ -142,6 +145,51 @@ public sealed partial class SettingsViewModel : ObservableObject
         }
 
         CloseRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    [RelayCommand]
+    private async Task LoadDemoContentAsync()
+    {
+        var confirmed = MessageBox.Show(
+            "Add curated demo clips to your history?\n\nYour existing items will not be affected. Duplicates are skipped.",
+            "Clipt Settings",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (confirmed != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        try
+        {
+            var result = await _demoContentSeeder.SeedAsync(CancellationToken.None);
+
+            var message = result.Inserted > 0
+                ? $"Added {result.Inserted} demo clip{(result.Inserted == 1 ? "" : "s")}."
+                : "All demo clips are already in your history.";
+
+            if (result.Updated > 0)
+            {
+                message += $"\n{result.Updated} clip{(result.Updated == 1 ? "" : "s")} already existed and {(result.Updated == 1 ? "was" : "were")} skipped.";
+            }
+
+            await _mainViewModel.RefreshFromDatabaseAsync();
+
+            MessageBox.Show(
+                message,
+                "Clipt Settings",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception)
+        {
+            MessageBox.Show(
+                "Could not load demo content. Please try again.",
+                "Clipt Settings",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
     }
 
     [RelayCommand]

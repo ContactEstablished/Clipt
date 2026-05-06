@@ -94,6 +94,7 @@ public partial class App : Application
         builder.Services.AddHostedService<AppLifecycleService>();
         builder.Services.AddHostedService<ClipboardMonitorHostedService>();
 
+        builder.Services.AddSingleton<DemoContentSeeder>();
         builder.Services.AddSingleton<MainViewModel>();
         builder.Services.AddTransient<PreviewViewModel>();
         builder.Services.AddSingleton<MainWindow>();

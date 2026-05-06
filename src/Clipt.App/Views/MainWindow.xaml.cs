@@ -28,6 +28,7 @@ public partial class MainWindow : Window
     private readonly ForegroundWindowTracker _foregroundTracker;
     private readonly IClipboardWriter _clipboardWriter;
     private readonly IInputSimulator _inputSimulator;
+    private readonly DemoContentSeeder _demoContentSeeder;
     private bool _isQuitting;
     private bool _isInitialized;
     private bool _isPasteInProgress;
@@ -44,6 +45,7 @@ public partial class MainWindow : Window
         ForegroundWindowTracker foregroundTracker,
         IClipboardWriter clipboardWriter,
         IInputSimulator inputSimulator,
+        DemoContentSeeder demoContentSeeder,
         ILogger<MainWindow> logger)
     {
         _viewModel = viewModel;
@@ -53,6 +55,7 @@ public partial class MainWindow : Window
         _foregroundTracker = foregroundTracker;
         _clipboardWriter = clipboardWriter;
         _inputSimulator = inputSimulator;
+        _demoContentSeeder = demoContentSeeder;
         _logger = logger;
         ShowFromTrayCommand = new RelayCommand(ShowFromTray);
 
@@ -261,7 +264,8 @@ public partial class MainWindow : Window
                 _hotkeyService,
                 _clipboardMonitor,
                 _viewModel,
-                ApplySettingsSnapshot);
+                ApplySettingsSnapshot,
+                _demoContentSeeder);
 
             _settingsWindow = new SettingsWindow(vm);
             _settingsWindow.Owner = this;
