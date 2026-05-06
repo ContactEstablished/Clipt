@@ -148,6 +148,7 @@
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
 
                                         <Border Grid.Column="0"
@@ -197,6 +198,32 @@
                                                        Foreground="{DynamicResource Clipt.Brush.TextMuted}"
                                                        Text="{Binding StatusLabel}" />
                                         </StackPanel>
+
+                                        <Button Grid.Column="3"
+                                                Width="28"
+                                                Height="28"
+                                                Margin="10,0,0,0"
+                                                Style="{StaticResource IconButtonStyle}"
+                                                ToolTip="Copy path"
+                                                Command="{Binding CopyPathCommand}">
+                                            <Button.Resources>
+                                                <Style x:Key="CopyPathIconStyle" TargetType="Path">
+                                                    <Setter Property="Stroke" Value="{DynamicResource Clipt.Brush.TextMuted}" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=IsMouseOver}" Value="True">
+                                                            <Setter Property="Stroke" Value="{DynamicResource Clipt.Brush.Accent}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Resources>
+                                            <Path Width="14"
+                                                  Height="14"
+                                                  Data="M8 3h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z M14 3V1.5A1.5 1.5 0 0 0 12.5 0h-8A1.5 1.5 0 0 0 3 1.5v8A1.5 1.5 0 0 0 4.5 11H6"
+                                                  StrokeLineJoin="Round"
+                                                  StrokeThickness="1.8"
+                                                  Stretch="Uniform"
+                                                  Style="{StaticResource CopyPathIconStyle}" />
+                                        </Button>
                                     </Grid>
                                 </Border>
                             </DataTemplate>
