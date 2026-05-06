@@ -38,6 +38,12 @@ public sealed record AppSettings
 
     public bool HonorClipboardViewerIgnore { get; init; } = true;
 
+    public int MaxHistoryItems { get; init; } = 500;
+
+    public int? AutoPruneAfterDays { get; init; }
+
+    public int MaxClipboardItemBytes { get; init; } = 10_485_760;
+
     public AppSettings ClampOpacity()
     {
         if (Opacity >= 0.1 && Opacity <= 1.0)

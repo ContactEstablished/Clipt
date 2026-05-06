@@ -47,6 +47,9 @@ public sealed class SettingsRepositoryTests : IAsyncDisposable
         settings.IgnoredAppPaths.Should().BeEmpty();
         settings.IgnoredPatterns.Should().BeEmpty();
         settings.HonorClipboardViewerIgnore.Should().BeTrue();
+        settings.MaxHistoryItems.Should().Be(500);
+        settings.AutoPruneAfterDays.Should().BeNull();
+        settings.MaxClipboardItemBytes.Should().Be(10_485_760);
     }
 
     [Fact]
@@ -74,6 +77,9 @@ public sealed class SettingsRepositoryTests : IAsyncDisposable
             IgnoredAppPaths = ["C:\\Program Files\\SecretApp"],
             IgnoredPatterns = ["secret", "regex:\\d{3}-\\d{2}-\\d{4}"],
             HonorClipboardViewerIgnore = false,
+            MaxHistoryItems = 200,
+            AutoPruneAfterDays = 30,
+            MaxClipboardItemBytes = 5_242_880,
         };
 
         await _repository.SaveAsync(original, CancellationToken.None);
@@ -98,6 +104,9 @@ public sealed class SettingsRepositoryTests : IAsyncDisposable
         loaded.IgnoredAppPaths.Should().BeEquivalentTo(["C:\\Program Files\\SecretApp"]);
         loaded.IgnoredPatterns.Should().BeEquivalentTo(["secret", "regex:\\d{3}-\\d{2}-\\d{4}"]);
         loaded.HonorClipboardViewerIgnore.Should().BeFalse();
+        loaded.MaxHistoryItems.Should().Be(200);
+        loaded.AutoPruneAfterDays.Should().Be(30);
+        loaded.MaxClipboardItemBytes.Should().Be(5_242_880);
     }
 
     [Fact]
@@ -249,6 +258,41 @@ public sealed class SettingsRepositoryTests : IAsyncDisposable
         loaded.IgnoredAppPaths.Should().BeEmpty();
         loaded.IgnoredPatterns.Should().BeEmpty();
         loaded.HonorClipboardViewerIgnore.Should().BeTrue();
+        loaded.MaxHistoryItems.Should().Be(500);
+        loaded.AutoPruneAfterDays.Should().BeNull();
+        loaded.MaxClipboardItemBytes.Should().Be(10_485_760);
+    }
+
+    [Fact]
+    public async Task SaveAsync_HistorySettings_RoundTrip()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var settings = new AppSettings
+        {
+            MaxHistoryItems = 100,
+            AutoPruneAfterDays = 7,
+            MaxClipboardItemBytes = 1_048_576,
+        };
+        await _repository.SaveAsync(settings, CancellationToken.None);
+
+        var loaded = await _repository.GetAsync(CancellationToken.None);
+        loaded.MaxHistoryItems.Should().Be(100);
+        loaded.AutoPruneAfterDays.Should().Be(7);
+        loaded.MaxClipboardItemBytes.Should().Be(1_048_576);
+    }
+
+    [Fact]
+    public async Task SaveAsync_MaxHistoryItemsZero_PersistsCorrectly()
+    {
+        // Zero means pruning disabled. It should round-trip correctly.
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var settings = new AppSettings { MaxHistoryItems = 0 };
+        await _repository.SaveAsync(settings, CancellationToken.None);
+
+        var loaded = await _repository.GetAsync(CancellationToken.None);
+        loaded.MaxHistoryItems.Should().Be(0);
     }
 
     [Fact]

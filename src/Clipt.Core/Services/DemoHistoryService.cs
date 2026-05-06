@@ -55,4 +55,10 @@ public sealed class DemoHistoryService : IHistoryService
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(0);
     }
+
+    public Task<int> PruneUnpinnedAsync(int maxItems, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(0);
+    }
 }

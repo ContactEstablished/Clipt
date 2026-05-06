@@ -15,4 +15,12 @@ public interface IHistoryService
     Task DeleteAsync(Guid id, CancellationToken cancellationToken);
 
     Task<int> ClearUnpinnedAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Deletes the oldest unpinned items so that at most <paramref name="maxItems"/>
+    /// unpinned rows remain. Pinned items are never deleted.
+    /// </summary>
+    /// <param name="maxItems">Maximum number of unpinned items to keep. Values &lt;= 0 disable pruning.</param>
+    /// <returns>The number of deleted rows.</returns>
+    Task<int> PruneUnpinnedAsync(int maxItems, CancellationToken cancellationToken);
 }

@@ -708,6 +708,229 @@ public sealed class ClipboardRepositoryTests : IAsyncDisposable
         items.Should().HaveCount(2);
     }
 
+    // ── History pruning ─────────────────────────────────────────────
+
+    [Fact]
+    public async Task PruneUnpinnedAsync_ExcessUnpinned_KeepsAtMostNUnpinned()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        for (var i = 0; i < 10; i++)
+        {
+            await _repository.SaveAsync(CreateTestItem($"Unpinned {i}"), CancellationToken.None);
+        }
+
+        var deleted = await _repository.PruneUnpinnedAsync(maxItems: 3, CancellationToken.None);
+        deleted.Should().Be(7);
+
+        var items = await _repository.GetItemsAsync(CancellationToken.None);
+        items.Should().HaveCount(3);
+        items.Should().AllSatisfy(i => i.IsPinned.Should().BeFalse());
+    }
+
+    [Fact]
+    public async Task PruneUnpinnedAsync_PreservesPinnedItems()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        await _repository.SaveAsync(CreateTestItem("Pinned keep", isPinned: true), CancellationToken.None);
+        await _repository.SaveAsync(CreateTestItem("Unpinned 1"), CancellationToken.None);
+        await _repository.SaveAsync(CreateTestItem("Unpinned 2"), CancellationToken.None);
+        await _repository.SaveAsync(CreateTestItem("Unpinned 3"), CancellationToken.None);
+
+        var deleted = await _repository.PruneUnpinnedAsync(maxItems: 2, CancellationToken.None);
+        deleted.Should().Be(1);
+
+        var items = await _repository.GetItemsAsync(CancellationToken.None);
+        // 1 pinned + 2 unpinned kept = 3 total
+        items.Should().HaveCount(3);
+        items.Should().ContainSingle(i => i.IsPinned && i.Title == "Pinned keep");
+        items.Where(i => !i.IsPinned).Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task PruneUnpinnedAsync_ManyPinned_UnpinnedKept_TotalExceedsMax()
+    {
+        // 20 pinned + 5 unpinned with max 3 unpinned → total rows = 23, unpinned = 3
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        for (var i = 0; i < 20; i++)
+        {
+            await _repository.SaveAsync(CreateTestItem($"Pinned {i}", isPinned: true), CancellationToken.None);
+        }
+
+        for (var i = 0; i < 5; i++)
+        {
+            await _repository.SaveAsync(CreateTestItem($"Unpinned {i}"), CancellationToken.None);
+        }
+
+        var deleted = await _repository.PruneUnpinnedAsync(maxItems: 3, CancellationToken.None);
+        deleted.Should().Be(2);
+
+        var items = await _repository.GetItemsAsync(CancellationToken.None);
+        items.Should().HaveCount(23);
+        items.Count(i => i.IsPinned).Should().Be(20);
+        items.Count(i => !i.IsPinned).Should().Be(3);
+    }
+
+    [Fact]
+    public async Task PruneUnpinnedAsync_RemovesOldestUnpinnedItemsFirst()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var baseTime = DateTimeOffset.UtcNow;
+
+        // Save items with staggered timestamps so we can verify oldest-first deletion.
+        var oldest = CreateTestItem("Oldest unpinned") with { CreatedAt = baseTime.AddHours(-10) };
+        var middle = CreateTestItem("Middle unpinned") with { CreatedAt = baseTime.AddHours(-5) };
+        var newest = CreateTestItem("Newest unpinned") with { CreatedAt = baseTime };
+
+        await _repository.SaveAsync(oldest, CancellationToken.None);
+        await _repository.SaveAsync(middle, CancellationToken.None);
+        await _repository.SaveAsync(newest, CancellationToken.None);
+
+        var deleted = await _repository.PruneUnpinnedAsync(maxItems: 1, CancellationToken.None);
+        deleted.Should().Be(2);
+
+        var items = await _repository.GetItemsAsync(CancellationToken.None);
+        items.Should().ContainSingle();
+        items[0].Title.Should().Be("Newest unpinned", "the newest unpinned item should survive pruning");
+    }
+
+    [Fact]
+    public async Task PruneUnpinnedAsync_ReturnsDeletedRowCount()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        for (var i = 0; i < 5; i++)
+        {
+            await _repository.SaveAsync(CreateTestItem($"Item {i}"), CancellationToken.None);
+        }
+
+        var deleted = await _repository.PruneUnpinnedAsync(maxItems: 2, CancellationToken.None);
+        deleted.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task PruneUnpinnedAsync_CountBelowMax_RemovesNone()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        await _repository.SaveAsync(CreateTestItem("Only item"), CancellationToken.None);
+
+        var deleted = await _repository.PruneUnpinnedAsync(maxItems: 5, CancellationToken.None);
+        deleted.Should().Be(0);
+
+        var items = await _repository.GetItemsAsync(CancellationToken.None);
+        items.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task PruneUnpinnedAsync_ZeroMaxItems_DisablesPruning()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        for (var i = 0; i < 10; i++)
+        {
+            await _repository.SaveAsync(CreateTestItem($"Item {i}"), CancellationToken.None);
+        }
+
+        var deleted = await _repository.PruneUnpinnedAsync(maxItems: 0, CancellationToken.None);
+        deleted.Should().Be(0);
+
+        var items = await _repository.GetItemsAsync(CancellationToken.None);
+        items.Should().HaveCount(10);
+    }
+
+    [Fact]
+    public async Task PruneUnpinnedAsync_NegativeMaxItems_DisablesPruning()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        for (var i = 0; i < 5; i++)
+        {
+            await _repository.SaveAsync(CreateTestItem($"Item {i}"), CancellationToken.None);
+        }
+
+        var deleted = await _repository.PruneUnpinnedAsync(maxItems: -1, CancellationToken.None);
+        deleted.Should().Be(0);
+
+        var items = await _repository.GetItemsAsync(CancellationToken.None);
+        items.Should().HaveCount(5);
+    }
+
+    [Fact]
+    public async Task PruneUnpinnedAsync_RemovesFtsRowsForDeletedItems()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        await _repository.SaveAsync(CreateTestItem("Will be pruned first text"), CancellationToken.None);
+        await _repository.SaveAsync(CreateTestItem("Will be pruned second text"), CancellationToken.None);
+        await _repository.SaveAsync(CreateTestItem("Will survive prune text"), CancellationToken.None);
+
+        // Verify all three are searchable before pruning.
+        var before = await _repository.SearchAsync("prune text", CancellationToken.None);
+        before.Should().HaveCount(3);
+
+        await _repository.PruneUnpinnedAsync(maxItems: 1, CancellationToken.None);
+
+        // After pruning, only the newest unpinned item should remain searchable.
+        var after = await _repository.SearchAsync("prune text", CancellationToken.None);
+        after.Should().ContainSingle();
+        after[0].Title.Should().Be("Will survive prune text");
+    }
+
+    [Fact]
+    public async Task PruneUnpinnedAsync_DeletesFormatRowsForRemovedItems()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var toPrune = CreateTestItemWithFormats("Pruned formatted",
+            formats: [("UnicodeText", "Pruned formatted"),
+                      ("HTML Format", "<b>Pruned</b>")]);
+        var kept = CreateTestItemWithFormats("Kept formatted",
+            formats: [("UnicodeText", "Kept formatted")]);
+
+        await _repository.SaveAsync(toPrune, CancellationToken.None);
+        await _repository.SaveAsync(kept, CancellationToken.None);
+
+        await _repository.PruneUnpinnedAsync(maxItems: 1, CancellationToken.None);
+
+        // Verify no orphaned format rows for the pruned item.
+        await using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(1) FROM clipboard_formats WHERE item_id = @id";
+        cmd.Parameters.AddWithValue("@id", toPrune.Id.ToString());
+        var count = (long)(await cmd.ExecuteScalarAsync())!;
+        count.Should().Be(0, "format rows should be cascade-deleted with the pruned item");
+    }
+
+    [Fact]
+    public async Task PruneUnpinnedAsync_EmptyTableIsNoOp()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var deleted = await _repository.PruneUnpinnedAsync(maxItems: 100, CancellationToken.None);
+        deleted.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task PruneUnpinnedAsync_AllPinnedRemovesNone()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        await _repository.SaveAsync(CreateTestItem("Pinned A", isPinned: true), CancellationToken.None);
+        await _repository.SaveAsync(CreateTestItem("Pinned B", isPinned: true), CancellationToken.None);
+
+        var deleted = await _repository.PruneUnpinnedAsync(maxItems: 1, CancellationToken.None);
+        deleted.Should().Be(0);
+
+        var items = await _repository.GetItemsAsync(CancellationToken.None);
+        items.Should().HaveCount(2);
+        items.Should().AllSatisfy(i => i.IsPinned.Should().BeTrue());
+    }
+
     public async ValueTask DisposeAsync()
     {
         _repository.Dispose();

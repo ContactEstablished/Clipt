@@ -17,21 +17,26 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly IHistoryService _historyService;
     private readonly ISearchService _searchService;
     private readonly IClipboardMonitor _clipboardMonitor;
+    private readonly ISettingsService _settingsService;
     private readonly ILogger<MainViewModel> _logger;
     private CancellationTokenSource? _searchCts;
 
     private bool _isDemoFallback;
     private List<ClipboardItem> _demoItems = [];
 
+    private int _cachedMaxHistoryItems = 500;
+
     public MainViewModel(
         IHistoryService historyService,
         ISearchService searchService,
         IClipboardMonitor clipboardMonitor,
+        ISettingsService settingsService,
         ILogger<MainViewModel> logger)
     {
         _historyService = historyService;
         _searchService = searchService;
         _clipboardMonitor = clipboardMonitor;
+        _settingsService = settingsService;
         _logger = logger;
         _clipboardMonitor.ClipboardItemCaptured += OnClipboardItemCaptured;
         ItemsView = CollectionViewSource.GetDefaultView(Items);
@@ -70,6 +75,17 @@ public sealed partial class MainViewModel : ObservableObject
         if (Items.Count > 0)
         {
             return;
+        }
+
+        // Cache history limit from settings once at startup.
+        try
+        {
+            var settings = await _settingsService.GetAsync(cancellationToken);
+            _cachedMaxHistoryItems = settings.MaxHistoryItems;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception, "Failed to load settings for history limit; using default {Default}.", _cachedMaxHistoryItems);
         }
 
         var items = await _historyService.GetItemsAsync(cancellationToken);
@@ -298,6 +314,27 @@ public sealed partial class MainViewModel : ObservableObject
             _isDemoFallback = false;
             _demoItems.Clear();
             Items.Clear();
+        }
+
+        // Prune oldest unpinned items to stay within the configured limit.
+        // Pinned items are never affected by pruning.
+        // Pruning runs after every save (including duplicates) to ensure the
+        // history stays bounded even if previous prunes were skipped.
+        try
+        {
+            var pruned = await _historyService.PruneUnpinnedAsync(_cachedMaxHistoryItems, CancellationToken.None);
+            if (pruned > 0)
+            {
+                // Items were removed — reload from the database to stay consistent.
+                await RefreshItemsAsync();
+                _clipboardMonitor.ResetDuplicateTracking();
+                SelectedItem = Items.FirstOrDefault(ci => ci.Id == savedItem.Id) ?? Items.FirstOrDefault();
+                return;
+            }
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Failed to prune clipboard history.");
         }
 
         var existing = Items.FirstOrDefault(candidate => candidate.Id == savedItem.Id);

@@ -383,6 +383,55 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
         }
     }
 
+    public async Task<int> PruneUnpinnedAsync(int maxItems, CancellationToken cancellationToken)
+    {
+        // Values <= 0 mean pruning is disabled.
+        if (maxItems <= 0)
+        {
+            return 0;
+        }
+
+        await _connectionLock.WaitAsync(cancellationToken);
+        try
+        {
+            var connection = await GetConnectionAsync(cancellationToken);
+
+            // Count current unpinned items.
+            using var countCommand = connection.CreateCommand();
+            countCommand.CommandText = "SELECT COUNT(1) FROM clipboard_items WHERE is_pinned = 0";
+            var unpinnedCount = (long)(await countCommand.ExecuteScalarAsync(cancellationToken))!;
+
+            var excess = (int)unpinnedCount - maxItems;
+            if (excess <= 0)
+            {
+                return 0;
+            }
+
+            // Delete oldest unpinned items first.
+            // FTS cleanup is handled by trg_clipboard_items_fts_ad.
+            // Format cleanup is handled by ON DELETE CASCADE on clipboard_formats.
+            using var deleteCommand = connection.CreateCommand();
+            deleteCommand.CommandText = """
+                DELETE FROM clipboard_items
+                WHERE id IN (
+                    SELECT id FROM clipboard_items
+                    WHERE is_pinned = 0
+                    ORDER BY created_at ASC
+                    LIMIT @excess
+                )
+                """;
+            deleteCommand.Parameters.AddWithValue("@excess", excess);
+            var rowsDeleted = await deleteCommand.ExecuteNonQueryAsync(cancellationToken);
+
+            _logger.LogDebug("Pruned {Count} oldest unpinned items (max {MaxItems} unpinned).", rowsDeleted, maxItems);
+            return rowsDeleted;
+        }
+        finally
+        {
+            _connectionLock.Release();
+        }
+    }
+
     public void Dispose()
     {
         if (_isDisposed)
