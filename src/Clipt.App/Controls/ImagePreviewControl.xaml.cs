@@ -17,7 +17,19 @@ public partial class ImagePreviewControl : UserControl
         nameof(ImageSource),
         typeof(ImageSource),
         typeof(ImagePreviewControl),
-        new PropertyMetadata(null));
+        new PropertyMetadata(null, OnImageSourceChanged));
+
+    public static readonly DependencyProperty IsImageLoadedProperty = DependencyProperty.Register(
+        nameof(IsImageLoaded),
+        typeof(bool),
+        typeof(ImagePreviewControl),
+        new PropertyMetadata(false));
+
+    public static readonly DependencyProperty ImageDetailTextProperty = DependencyProperty.Register(
+        nameof(ImageDetailText),
+        typeof(string),
+        typeof(ImagePreviewControl),
+        new PropertyMetadata(string.Empty));
 
     public ImagePreviewControl()
     {
@@ -36,16 +48,29 @@ public partial class ImagePreviewControl : UserControl
         private set => SetValue(ImageSourceProperty, value);
     }
 
+    public bool IsImageLoaded
+    {
+        get => (bool)GetValue(IsImageLoadedProperty);
+        private set => SetValue(IsImageLoadedProperty, value);
+    }
+
+    public string ImageDetailText
+    {
+        get => (string)GetValue(ImageDetailTextProperty);
+        set => SetValue(ImageDetailTextProperty, value);
+    }
+
     private static void OnImageUriChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs e)
     {
-        if (dependencyObject is not ImagePreviewControl control || e.NewValue is not string imageUri)
+        if (dependencyObject is not ImagePreviewControl control)
         {
             return;
         }
 
+        var imageUri = e.NewValue as string;
         if (string.IsNullOrWhiteSpace(imageUri))
         {
-            control.ImageSource = null;
+            control.UpdateImageState(null);
             return;
         }
 
@@ -66,7 +91,21 @@ public partial class ImagePreviewControl : UserControl
         }
         catch
         {
-            control.ImageSource = null;
+            control.UpdateImageState(null);
         }
+    }
+
+    private static void OnImageSourceChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs e)
+    {
+        if (dependencyObject is ImagePreviewControl control)
+        {
+            control.IsImageLoaded = e.NewValue is not null;
+        }
+    }
+
+    private void UpdateImageState(ImageSource? source)
+    {
+        ImageSource = source;
+        IsImageLoaded = source is not null;
     }
 }

@@ -49,5 +49,9 @@ public sealed class ClipboardItemViewModel(ClipboardItem model)
 
     public bool HasImagePreviewActions => ImagePreviewActions is not null;
 
+    public bool HasImagePreviewUri => !string.IsNullOrEmpty(Model.ImageUri);
+
+    public string ImagePreviewDetail => Model.PreviewText;
+
     public string FilePathSummary => FilePathDisplayHelper.FormatCountSummary(Model.FilePaths);
 }

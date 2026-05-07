@@ -79,7 +79,8 @@
                                          Visibility="{Binding ContentType, Converter={StaticResource ContentTypeVisibilityConverter}, ConverterParameter=Code|Json}" />
 
             <StackPanel Visibility="{Binding ContentType, Converter={StaticResource ContentTypeVisibilityConverter}, ConverterParameter=Image}">
-                <controls:ImagePreviewControl ImageUri="{Binding ImageUri}" />
+                <controls:ImagePreviewControl ImageUri="{Binding ImageUri}"
+                                               ImageDetailText="{Binding ImagePreviewDetail}" />
 
                 <Border Margin="0,8,0,0"
                         Padding="10,8"

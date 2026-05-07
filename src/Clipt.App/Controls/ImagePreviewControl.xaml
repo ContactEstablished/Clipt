@@ -1,13 +1,51 @@
 <UserControl x:Class="Clipt.App.Controls.ImagePreviewControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:converters="clr-namespace:Clipt.App.Converters">
+    <UserControl.Resources>
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+    </UserControl.Resources>
+
     <Border Background="#101014"
             BorderBrush="{DynamicResource Clipt.Brush.Border}"
             BorderThickness="1"
             CornerRadius="8"
             Padding="12">
-        <Image Source="{Binding ImageSource, RelativeSource={RelativeSource AncestorType=UserControl}}"
-               Stretch="Uniform"
-               RenderOptions.BitmapScalingMode="HighQuality" />
+        <Grid>
+            <Image Source="{Binding ImageSource, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                   Stretch="Uniform"
+                   RenderOptions.BitmapScalingMode="HighQuality"
+                   Visibility="{Binding IsImageLoaded, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+            <Border CornerRadius="6"
+                    Visibility="{Binding IsImageLoaded, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}">
+                <StackPanel HorizontalAlignment="Center"
+                            VerticalAlignment="Center">
+                    <Path Width="36"
+                          Height="36"
+                          HorizontalAlignment="Center"
+                          Data="M2.5 6.5h11l3.5 3.5v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-10a1 1 0 0 1 .5-.93 M2.5 7l4.5 4.5h-4.5 M7 11.5l2-2 3 3M17 7v10a1 1 0 0 1-1 1h-10"
+                          Fill="none"
+                          Stroke="{DynamicResource Clipt.Brush.TextMuted}"
+                          StrokeLineJoin="Round"
+                          Stretch="Uniform"
+                          StrokeThickness="1.5" />
+
+                    <TextBlock Margin="0,14,0,0"
+                               HorizontalAlignment="Center"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource Clipt.Brush.TextSecondary}"
+                               Text="Preview unavailable" />
+
+                    <TextBlock Margin="0,8,0,0"
+                               HorizontalAlignment="Center"
+                               FontSize="12"
+                               Foreground="{DynamicResource Clipt.Brush.TextMuted}"
+                               Text="{Binding ImageDetailText, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                               TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+            </Border>
+        </Grid>
     </Border>
 </UserControl>
