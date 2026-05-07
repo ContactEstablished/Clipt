@@ -119,6 +119,9 @@ public partial class HotkeyCaptureControl : UserControl
         var key = ResolveKey(e);
         if (key == Key.None || IsModifierKey(key))
         {
+            // Live preview: show the modifiers currently held while the user
+            // is still composing the shortcut (before pressing the final key).
+            RenderCapturePreview();
             e.Handled = true;
             return;
         }
@@ -137,6 +140,22 @@ public partial class HotkeyCaptureControl : UserControl
         e.Handled = true;
     }
 
+    private void OnPreviewKeyUp(object sender, KeyEventArgs e)
+    {
+        if (!IsCapturing)
+        {
+            return;
+        }
+
+        // When a modifier is released mid-capture, refresh the preview so the
+        // user always sees what is currently held.
+        var key = ResolveKey(e);
+        if (IsModifierKey(key))
+        {
+            RenderCapturePreview();
+        }
+    }
+
     private void BeginCapture()
     {
         IsCapturing = true;
@@ -149,13 +168,54 @@ public partial class HotkeyCaptureControl : UserControl
     {
         if (IsCapturing)
         {
-            DisplayText = "Press a shortcut";
-            StateLabel = "Listening";
+            RenderCapturePreview();
             return;
         }
 
         DisplayText = FormatDisplayText(HotkeyText);
         StateLabel = "Record";
+    }
+
+    /// <summary>
+    /// Renders the current capture preview. If no modifiers are held, shows
+    /// the generic "Press a shortcut" prompt; otherwise echoes the held
+    /// modifiers with a trailing ellipsis (e.g. "Ctrl + Shift + …") so the
+    /// user has feedback while composing the gesture.
+    /// </summary>
+    private void RenderCapturePreview()
+    {
+        var modifiers = Keyboard.Modifiers;
+        if (modifiers == ModifierKeys.None)
+        {
+            DisplayText = "Press a shortcut";
+            StateLabel = "Listening";
+            return;
+        }
+
+        var parts = new List<string>(4);
+        if (modifiers.HasFlag(ModifierKeys.Control))
+        {
+            parts.Add("Ctrl");
+        }
+
+        if (modifiers.HasFlag(ModifierKeys.Alt))
+        {
+            parts.Add("Alt");
+        }
+
+        if (modifiers.HasFlag(ModifierKeys.Shift))
+        {
+            parts.Add("Shift");
+        }
+
+        if (modifiers.HasFlag(ModifierKeys.Windows))
+        {
+            parts.Add("Win");
+        }
+
+        parts.Add("…");
+        DisplayText = string.Join(" + ", parts);
+        StateLabel = "Listening";
     }
 
     private static Key ResolveKey(KeyEventArgs e)

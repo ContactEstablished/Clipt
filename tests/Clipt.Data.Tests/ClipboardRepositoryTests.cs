@@ -1274,6 +1274,224 @@ public sealed class ClipboardRepositoryTests : IAsyncDisposable
         remaining.Should().Contain(i => i.Id == middleImage.Id && i.ImageUri == survivingImageUri);
     }
 
+    // ── Age-based pruning ────────────────────────────────────────────
+
+    [Fact]
+    public async Task PruneOlderThanAsync_DeletesOnlyItemsOlderThanCutoff()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var now = DateTimeOffset.UtcNow;
+
+        var ancient = CreateTestItem("Ancient") with { CreatedAt = now.AddDays(-30) };
+        var recent = CreateTestItem("Recent") with { CreatedAt = now.AddDays(-3) };
+        var fresh = CreateTestItem("Fresh") with { CreatedAt = now };
+
+        await _repository.SaveAsync(ancient, CancellationToken.None);
+        await _repository.SaveAsync(recent, CancellationToken.None);
+        await _repository.SaveAsync(fresh, CancellationToken.None);
+
+        var result = await _repository.PruneOlderThanAsync(maxAgeDays: 7, CancellationToken.None);
+        result.Count.Should().Be(1);
+
+        var remaining = await _repository.GetItemsAsync(CancellationToken.None);
+        remaining.Should().HaveCount(2);
+        remaining.Should().NotContain(i => i.Title == "Ancient");
+    }
+
+    [Fact]
+    public async Task PruneOlderThanAsync_PreservesPinnedItemsEvenWhenOld()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var now = DateTimeOffset.UtcNow;
+
+        var oldPinned = CreateTestItem("Old pinned", isPinned: true) with { CreatedAt = now.AddDays(-100) };
+        var oldUnpinned = CreateTestItem("Old unpinned") with { CreatedAt = now.AddDays(-100) };
+
+        await _repository.SaveAsync(oldPinned, CancellationToken.None);
+        await _repository.SaveAsync(oldUnpinned, CancellationToken.None);
+
+        var result = await _repository.PruneOlderThanAsync(maxAgeDays: 7, CancellationToken.None);
+        result.Count.Should().Be(1);
+
+        var remaining = await _repository.GetItemsAsync(CancellationToken.None);
+        remaining.Should().ContainSingle();
+        remaining[0].IsPinned.Should().BeTrue();
+        remaining[0].Title.Should().Be("Old pinned");
+    }
+
+    [Fact]
+    public async Task PruneOlderThanAsync_ZeroOrNegativeDays_DisablesPruning()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var now = DateTimeOffset.UtcNow;
+        await _repository.SaveAsync(
+            CreateTestItem("Ancient") with { CreatedAt = now.AddDays(-365) },
+            CancellationToken.None);
+
+        var zero = await _repository.PruneOlderThanAsync(maxAgeDays: 0, CancellationToken.None);
+        zero.Count.Should().Be(0);
+
+        var negative = await _repository.PruneOlderThanAsync(maxAgeDays: -10, CancellationToken.None);
+        negative.Count.Should().Be(0);
+
+        var remaining = await _repository.GetItemsAsync(CancellationToken.None);
+        remaining.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task PruneOlderThanAsync_NothingOldEnough_RemovesNone()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var now = DateTimeOffset.UtcNow;
+        await _repository.SaveAsync(
+            CreateTestItem("Recent") with { CreatedAt = now.AddDays(-2) },
+            CancellationToken.None);
+
+        var result = await _repository.PruneOlderThanAsync(maxAgeDays: 30, CancellationToken.None);
+        result.Count.Should().Be(0);
+
+        var remaining = await _repository.GetItemsAsync(CancellationToken.None);
+        remaining.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task PruneOlderThanAsync_EmptyTable_IsNoOp()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var result = await _repository.PruneOlderThanAsync(maxAgeDays: 7, CancellationToken.None);
+        result.Count.Should().Be(0);
+        result.ImageUris.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task PruneOlderThanAsync_RemovesFtsRowsForDeletedItems()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var now = DateTimeOffset.UtcNow;
+        await _repository.SaveAsync(
+            CreateTestItem("Will be aged out unique-marker") with { CreatedAt = now.AddDays(-30) },
+            CancellationToken.None);
+        await _repository.SaveAsync(
+            CreateTestItem("Will survive unique-marker") with { CreatedAt = now },
+            CancellationToken.None);
+
+        var before = await _repository.SearchAsync("unique-marker", CancellationToken.None);
+        before.Should().HaveCount(2);
+
+        await _repository.PruneOlderThanAsync(maxAgeDays: 7, CancellationToken.None);
+
+        var after = await _repository.SearchAsync("unique-marker", CancellationToken.None);
+        after.Should().ContainSingle();
+        after[0].Title.Should().Be("Will survive unique-marker");
+    }
+
+    [Fact]
+    public async Task PruneOlderThanAsync_DeletesFormatRowsForRemovedItems()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var now = DateTimeOffset.UtcNow;
+        var aged = CreateTestItemWithFormats(
+            "Aged formatted",
+            formats: [("UnicodeText", "Aged formatted"), ("HTML Format", "<b>Aged</b>")]) with
+        {
+            CreatedAt = now.AddDays(-30),
+        };
+        var kept = CreateTestItemWithFormats(
+            "Kept formatted",
+            formats: [("UnicodeText", "Kept formatted")]) with
+        {
+            CreatedAt = now,
+        };
+
+        await _repository.SaveAsync(aged, CancellationToken.None);
+        await _repository.SaveAsync(kept, CancellationToken.None);
+
+        await _repository.PruneOlderThanAsync(maxAgeDays: 7, CancellationToken.None);
+
+        await using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await connection.OpenAsync();
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(1) FROM clipboard_formats WHERE item_id = @id";
+        cmd.Parameters.AddWithValue("@id", aged.Id.ToString());
+        var count = (long)(await cmd.ExecuteScalarAsync())!;
+        count.Should().Be(0, "format rows should be cascade-deleted with the pruned item");
+    }
+
+    [Fact]
+    public async Task PruneOlderThanAsync_ReturnsImageUrisOfPrunedImageItems()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var now = DateTimeOffset.UtcNow;
+        const string agedUri = "file:///C:/cache/preview-cache/img_age_old.png";
+        const string keptUri = "file:///C:/cache/preview-cache/img_age_new.png";
+
+        var aged = CreateTestItem("Aged image") with
+        {
+            CreatedAt = now.AddDays(-30),
+            ContentType = ContentType.Image,
+            ImageUri = agedUri,
+        };
+        var kept = CreateTestItem("Kept image") with
+        {
+            CreatedAt = now,
+            ContentType = ContentType.Image,
+            ImageUri = keptUri,
+        };
+
+        await _repository.SaveAsync(aged, CancellationToken.None);
+        await _repository.SaveAsync(kept, CancellationToken.None);
+
+        var result = await _repository.PruneOlderThanAsync(maxAgeDays: 7, CancellationToken.None);
+
+        result.Count.Should().Be(1);
+        result.ImageUris.Should().ContainSingle().Which.Should().Be(agedUri);
+        result.ImageUris.Should().NotContain(keptUri);
+
+        var remaining = await _repository.GetItemsAsync(CancellationToken.None);
+        remaining.Should().ContainSingle();
+        remaining[0].ImageUri.Should().Be(keptUri);
+    }
+
+    [Fact]
+    public async Task PruneOlderThanAsync_PinnedImageItems_NeverIncludedInPrunedUris()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var now = DateTimeOffset.UtcNow;
+        const string pinnedUri = "file:///C:/cache/preview-cache/img_age_pinned.png";
+        const string prunedUri = "file:///C:/cache/preview-cache/img_age_pruned.png";
+
+        var pinnedOld = CreateTestItem("Pinned old image", isPinned: true) with
+        {
+            CreatedAt = now.AddDays(-100),
+            ContentType = ContentType.Image,
+            ImageUri = pinnedUri,
+        };
+        var unpinnedOld = CreateTestItem("Unpinned old image") with
+        {
+            CreatedAt = now.AddDays(-100),
+            ContentType = ContentType.Image,
+            ImageUri = prunedUri,
+        };
+
+        await _repository.SaveAsync(pinnedOld, CancellationToken.None);
+        await _repository.SaveAsync(unpinnedOld, CancellationToken.None);
+
+        var result = await _repository.PruneOlderThanAsync(maxAgeDays: 7, CancellationToken.None);
+
+        result.Count.Should().Be(1);
+        result.ImageUris.Should().ContainSingle().Which.Should().Be(prunedUri);
+        result.ImageUris.Should().NotContain(pinnedUri, "pinned images are never pruned");
+    }
+
     // ── GetImageUrisAsync ────────────────────────────────────────────
 
     [Fact]

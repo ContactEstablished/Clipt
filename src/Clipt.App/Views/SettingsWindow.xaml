@@ -99,7 +99,7 @@
                                    Text="Retention" />
                         <TextBlock Foreground="{DynamicResource Clipt.Brush.TextSecondary}"
                                    TextWrapping="Wrap"
-                                   Text="Maximum unpinned items kept when new captures arrive. Pinned items are not pruned." />
+                                   Text="Pinned items are never pruned. The two limits below run at startup and after every capture." />
                         <TextBlock Margin="0,14,0,6"
                                    Foreground="{DynamicResource Clipt.Brush.TextSecondary}"
                                    Text="Max history items" />
@@ -112,6 +112,50 @@
                                  Padding="8,6"
                                  CaretBrush="{DynamicResource Clipt.Brush.Accent}"
                                  Text="{Binding MaxHistoryItemsText, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <TextBlock Margin="0,14,0,6"
+                                   Foreground="{DynamicResource Clipt.Brush.TextSecondary}"
+                                   Text="Auto-prune after (days)" />
+                        <TextBox Width="160"
+                                 HorizontalAlignment="Left"
+                                 Foreground="{DynamicResource Clipt.Brush.Text}"
+                                 Background="#1C1C20"
+                                 BorderBrush="{DynamicResource Clipt.Brush.Border}"
+                                 BorderThickness="1"
+                                 Padding="8,6"
+                                 CaretBrush="{DynamicResource Clipt.Brush.Accent}"
+                                 Text="{Binding AutoPruneAfterDaysText, UpdateSourceTrigger=PropertyChanged}"
+                                 ToolTip="Leave blank or 0 to disable. Items older than this are removed automatically." />
+                        <TextBlock Margin="0,4,0,0"
+                                   Foreground="{DynamicResource Clipt.Brush.TextMuted}"
+                                   FontSize="12"
+                                   Text="Leave blank or 0 to keep history forever." />
+
+                        <Separator Margin="0,18,0,14" />
+
+                        <TextBlock FontWeight="SemiBold"
+                                   Margin="0,0,0,10"
+                                   Text="Per-clip size limit" />
+                        <TextBlock Foreground="{DynamicResource Clipt.Brush.TextSecondary}"
+                                   TextWrapping="Wrap"
+                                   Text="Skip clipboard items larger than this. Images use their estimated decoded size." />
+                        <TextBlock Margin="0,14,0,6"
+                                   Foreground="{DynamicResource Clipt.Brush.TextSecondary}"
+                                   Text="Max clip size (MB)" />
+                        <TextBox Width="160"
+                                 HorizontalAlignment="Left"
+                                 Foreground="{DynamicResource Clipt.Brush.Text}"
+                                 Background="#1C1C20"
+                                 BorderBrush="{DynamicResource Clipt.Brush.Border}"
+                                 BorderThickness="1"
+                                 Padding="8,6"
+                                 CaretBrush="{DynamicResource Clipt.Brush.Accent}"
+                                 Text="{Binding MaxClipSizeMegabytesText, UpdateSourceTrigger=PropertyChanged}"
+                                 ToolTip="0 disables the cap. Decimals allowed (e.g. 0.5)." />
+                        <TextBlock Margin="0,4,0,0"
+                                   Foreground="{DynamicResource Clipt.Brush.TextMuted}"
+                                   FontSize="12"
+                                   Text="0 disables the cap. Decimals allowed (e.g. 0.5)." />
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
@@ -203,7 +247,26 @@
                                    TextWrapping="Wrap"
                                    Margin="0,0,0,10"
                                    Text="Click the field, then press modifiers (Ctrl, Alt, Shift, Win) plus one key." />
-                        <controls:HotkeyCaptureControl HotkeyText="{Binding OpenHotkeyText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <controls:HotkeyCaptureControl
+                                Grid.Column="0"
+                                HotkeyText="{Binding OpenHotkeyText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <Button Grid.Column="1"
+                                    Margin="10,0,0,0"
+                                    Padding="10,6"
+                                    VerticalAlignment="Center"
+                                    Background="Transparent"
+                                    BorderBrush="Transparent"
+                                    Foreground="{DynamicResource Clipt.Brush.Accent}"
+                                    Cursor="Hand"
+                                    Content="Reset"
+                                    Command="{Binding ResetOpenHotkeyCommand}"
+                                    ToolTip="Reset to Ctrl+Shift+V" />
+                        </Grid>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

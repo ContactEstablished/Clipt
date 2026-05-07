@@ -62,6 +62,12 @@ public sealed class DemoHistoryService : IHistoryService
         return Task.FromResult(HistoryDeletionResult.Empty);
     }
 
+    public Task<HistoryDeletionResult> PruneOlderThanAsync(int maxAgeDays, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(HistoryDeletionResult.Empty);
+    }
+
     public Task<IReadOnlyList<string>> GetImageUrisAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

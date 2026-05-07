@@ -52,6 +52,12 @@ public sealed partial class SettingsViewModel : ObservableObject
     public partial string MaxHistoryItemsText { get; set; } = "500";
 
     [ObservableProperty]
+    public partial string AutoPruneAfterDaysText { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string MaxClipSizeMegabytesText { get; set; } = "10";
+
+    [ObservableProperty]
     public partial string IgnoredAppNamesText { get; set; } = string.Empty;
 
     [ObservableProperty]
@@ -75,6 +81,10 @@ public sealed partial class SettingsViewModel : ObservableObject
         AutoPasteOnEnter = s.AutoPasteOnEnter;
         RestorePreviousClipboardAfterPaste = s.RestorePreviousClipboardAfterPaste;
         MaxHistoryItemsText = s.MaxHistoryItems.ToString(CultureInfo.InvariantCulture);
+        AutoPruneAfterDaysText = s.AutoPruneAfterDays is { } days
+            ? days.ToString(CultureInfo.InvariantCulture)
+            : string.Empty;
+        MaxClipSizeMegabytesText = FormatBytesAsMegabytes(s.MaxClipboardItemBytes);
         IgnoredAppNamesText = JoinLines(s.IgnoredAppNames);
         IgnoredAppPathsText = JoinLines(s.IgnoredAppPaths);
         IgnoredPatternsText = JoinLines(s.IgnoredPatterns);
@@ -107,11 +117,44 @@ public sealed partial class SettingsViewModel : ObservableObject
             return;
         }
 
+        int? autoPruneAfterDays;
+        var autoPruneText = AutoPruneAfterDaysText.Trim();
+        if (autoPruneText.Length == 0)
+        {
+            autoPruneAfterDays = null;
+        }
+        else if (int.TryParse(autoPruneText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedDays)
+                 && parsedDays >= 0)
+        {
+            autoPruneAfterDays = parsedDays == 0 ? null : parsedDays;
+        }
+        else
+        {
+            MessageBox.Show(
+                "Auto-prune days must be empty (disabled) or a non-negative whole number.",
+                "Clipt Settings",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        if (!TryParseMegabytesAsBytes(MaxClipSizeMegabytesText.Trim(), out var maxClipBytes))
+        {
+            MessageBox.Show(
+                "Max clip size must be a positive number of megabytes (e.g. 10 or 0.5). Use 0 to disable the cap.",
+                "Clipt Settings",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
         var updated = _baseline with
         {
             AutoPasteOnEnter = AutoPasteOnEnter,
             RestorePreviousClipboardAfterPaste = _baseline.RestorePreviousClipboardAfterPaste,
             MaxHistoryItems = maxHistory,
+            AutoPruneAfterDays = autoPruneAfterDays,
+            MaxClipboardItemBytes = maxClipBytes,
             IgnoredAppNames = SplitLines(IgnoredAppNamesText),
             IgnoredAppPaths = SplitLines(IgnoredAppPathsText),
             IgnoredPatterns = SplitLines(IgnoredPatternsText),
@@ -127,6 +170,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             _baseline = normalized;
             _applySettingsToShell(normalized);
             _mainViewModel.SetCachedMaxHistoryItems(normalized.MaxHistoryItems);
+            _mainViewModel.SetCachedAutoPruneAfterDays(normalized.AutoPruneAfterDays ?? 0);
             await _clipboardMonitor.RefreshCachedPrivacySettingsAsync(CancellationToken.None);
             await _hotkeyService.RegisterFromSettingsAsync(CancellationToken.None);
         }
@@ -196,6 +240,58 @@ public sealed partial class SettingsViewModel : ObservableObject
     private void Cancel()
     {
         CloseRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Resets the open-hotkey field to the project default. The new value is
+    /// not persisted until the user clicks Save.
+    /// </summary>
+    [RelayCommand]
+    private void ResetOpenHotkey()
+    {
+        OpenHotkeyText = DefaultOpenHotkey;
+    }
+
+    private const string DefaultOpenHotkey = "Ctrl+Shift+V";
+
+    private const long BytesPerMegabyte = 1_048_576;
+
+    private static string FormatBytesAsMegabytes(int bytes)
+    {
+        if (bytes <= 0)
+        {
+            return "0";
+        }
+
+        var megabytes = bytes / (double)BytesPerMegabyte;
+        // Trim trailing zeroes but keep precision when the number is fractional.
+        return megabytes.ToString("0.##", CultureInfo.InvariantCulture);
+    }
+
+    private static bool TryParseMegabytesAsBytes(string text, out int bytes)
+    {
+        bytes = 0;
+        if (text.Length == 0)
+        {
+            return false;
+        }
+
+        if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var megabytes)
+            || megabytes < 0
+            || double.IsNaN(megabytes)
+            || double.IsInfinity(megabytes))
+        {
+            return false;
+        }
+
+        var raw = megabytes * BytesPerMegabyte;
+        if (raw > int.MaxValue)
+        {
+            return false;
+        }
+
+        bytes = (int)Math.Round(raw);
+        return true;
     }
 
     private static string JoinLines(IReadOnlyList<string> lines)

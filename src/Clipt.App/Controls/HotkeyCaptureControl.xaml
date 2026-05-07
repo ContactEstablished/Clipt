@@ -5,8 +5,10 @@
              MinHeight="42"
              Focusable="True"
              Cursor="Hand"
+             FocusVisualStyle="{x:Null}"
              MouseLeftButtonDown="OnMouseLeftButtonDown"
              PreviewKeyDown="OnPreviewKeyDown"
+             PreviewKeyUp="OnPreviewKeyUp"
              LostKeyboardFocus="OnLostKeyboardFocus">
     <Border x:Name="Chrome"
             BorderThickness="1"

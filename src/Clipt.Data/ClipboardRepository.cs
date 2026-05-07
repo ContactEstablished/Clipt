@@ -476,6 +476,60 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
         }
     }
 
+    public async Task<HistoryDeletionResult> PruneOlderThanAsync(int maxAgeDays, CancellationToken cancellationToken)
+    {
+        // Values <= 0 mean age-based pruning is disabled.
+        if (maxAgeDays <= 0)
+        {
+            return HistoryDeletionResult.Empty;
+        }
+
+        var cutoffMs = DateTimeOffset.UtcNow.AddDays(-maxAgeDays).ToUnixTimeMilliseconds();
+
+        await _connectionLock.WaitAsync(cancellationToken);
+        try
+        {
+            var connection = await GetConnectionAsync(cancellationToken);
+
+            // Collect image URIs for items about to be pruned so callers can clean
+            // up the preview cache without the repository touching the filesystem.
+            using var selectCommand = connection.CreateCommand();
+            selectCommand.CommandText = """
+                SELECT image_uri FROM clipboard_items
+                WHERE is_pinned = 0
+                  AND created_at < @cutoff
+                  AND image_uri IS NOT NULL
+                """;
+            selectCommand.Parameters.AddWithValue("@cutoff", cutoffMs);
+            var imageUris = new List<string>();
+            await using (var reader = await selectCommand.ExecuteReaderAsync(cancellationToken))
+            {
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    imageUris.Add(reader.GetString(0));
+                }
+            }
+
+            // FTS cleanup is handled by trg_clipboard_items_fts_ad.
+            // Format cleanup is handled by ON DELETE CASCADE on clipboard_formats.
+            using var deleteCommand = connection.CreateCommand();
+            deleteCommand.CommandText = """
+                DELETE FROM clipboard_items
+                WHERE is_pinned = 0
+                  AND created_at < @cutoff
+                """;
+            deleteCommand.Parameters.AddWithValue("@cutoff", cutoffMs);
+            var rowsDeleted = await deleteCommand.ExecuteNonQueryAsync(cancellationToken);
+
+            _logger.LogDebug("Pruned {Count} unpinned items older than {Days} day(s).", rowsDeleted, maxAgeDays);
+            return new HistoryDeletionResult(rowsDeleted, imageUris);
+        }
+        finally
+        {
+            _connectionLock.Release();
+        }
+    }
+
     public async Task<IReadOnlyList<string>> GetImageUrisAsync(CancellationToken cancellationToken)
     {
         await _connectionLock.WaitAsync(cancellationToken);
