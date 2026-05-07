@@ -30,6 +30,15 @@ public interface IHistoryService
     Task<HistoryDeletionResult> PruneUnpinnedAsync(int maxItems, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Deletes unpinned items whose <c>CreatedAt</c> is older than <paramref name="maxAgeDays"/> days
+    /// before <c>DateTimeOffset.UtcNow</c>. Pinned items are never deleted.
+    /// Returns the deleted row count and image preview URIs that were removed;
+    /// callers are responsible for deleting any referenced preview cache files.
+    /// </summary>
+    /// <param name="maxAgeDays">Maximum age in days for unpinned items. Values &lt;= 0 disable pruning.</param>
+    Task<HistoryDeletionResult> PruneOlderThanAsync(int maxAgeDays, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Returns all persisted image preview URIs from clipboard items that have an image_uri.
     /// Used on startup to reconcile the preview cache against the database.
     /// </summary>

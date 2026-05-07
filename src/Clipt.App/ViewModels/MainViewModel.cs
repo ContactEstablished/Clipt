@@ -28,6 +28,7 @@ public sealed partial class MainViewModel : ObservableObject
     private List<ClipboardItem> _demoItems = [];
 
     private int _cachedMaxHistoryItems = 500;
+    private int _cachedAutoPruneAfterDays;
 
     /// <summary>
     /// Updates the in-memory history cap after settings are saved (no restart).
@@ -35,6 +36,15 @@ public sealed partial class MainViewModel : ObservableObject
     public void SetCachedMaxHistoryItems(int maxHistoryItems)
     {
         _cachedMaxHistoryItems = Math.Max(0, maxHistoryItems);
+    }
+
+    /// <summary>
+    /// Updates the in-memory age-based prune threshold after settings are saved.
+    /// Zero or negative values disable age-based pruning.
+    /// </summary>
+    public void SetCachedAutoPruneAfterDays(int autoPruneAfterDays)
+    {
+        _cachedAutoPruneAfterDays = Math.Max(0, autoPruneAfterDays);
     }
 
     public MainViewModel(
@@ -100,10 +110,27 @@ public sealed partial class MainViewModel : ObservableObject
         {
             var settings = await _settingsService.GetAsync(cancellationToken);
             _cachedMaxHistoryItems = settings.MaxHistoryItems;
+            _cachedAutoPruneAfterDays = Math.Max(0, settings.AutoPruneAfterDays ?? 0);
         }
         catch (Exception exception)
         {
             _logger.LogWarning(exception, "Failed to load settings for history limit; using default {Default}.", _cachedMaxHistoryItems);
+        }
+
+        // Prune aged items before loading the initial view so we don't briefly
+        // surface rows that are about to disappear.
+        try
+        {
+            var ageResult = await _historyService.PruneOlderThanAsync(_cachedAutoPruneAfterDays, cancellationToken);
+            if (ageResult.Count > 0)
+            {
+                _imagePreviewCache.TryDeletePreviews(ageResult.ImageUris);
+                _logger.LogInformation("Pruned {Count} aged clipboard items at startup.", ageResult.Count);
+            }
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception, "Startup age-based prune failed; continuing with current items.");
         }
 
         var items = await _historyService.GetItemsAsync(cancellationToken);
@@ -410,16 +437,20 @@ public sealed partial class MainViewModel : ObservableObject
             Items.Clear();
         }
 
-        // Prune oldest unpinned items to stay within the configured limit.
+        // Prune oldest unpinned items to stay within the configured limit, and
+        // additionally drop any items that have aged past the configured cutoff.
         // Pinned items are never affected by pruning.
         // Pruning runs after every save (including duplicates) to ensure the
         // history stays bounded even if previous prunes were skipped.
         try
         {
-            var pruneResult = await _historyService.PruneUnpinnedAsync(_cachedMaxHistoryItems, CancellationToken.None);
-            if (pruneResult.Count > 0)
+            var maxItemsResult = await _historyService.PruneUnpinnedAsync(_cachedMaxHistoryItems, CancellationToken.None);
+            var ageResult = await _historyService.PruneOlderThanAsync(_cachedAutoPruneAfterDays, CancellationToken.None);
+            var totalRemoved = maxItemsResult.Count + ageResult.Count;
+            if (totalRemoved > 0)
             {
-                _imagePreviewCache.TryDeletePreviews(pruneResult.ImageUris);
+                var prunedImageUris = maxItemsResult.ImageUris.Concat(ageResult.ImageUris).ToList();
+                _imagePreviewCache.TryDeletePreviews(prunedImageUris);
                 // Items were removed — reload from the database to stay consistent.
                 await RefreshItemsAsync();
                 _clipboardMonitor.ResetDuplicateTracking();

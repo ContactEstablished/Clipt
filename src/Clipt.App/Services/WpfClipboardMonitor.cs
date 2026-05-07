@@ -92,6 +92,12 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
         _logger.LogDebug("Duplicate tracking reset after history mutation.");
     }
 
+    private bool IsWithinSizeLimit(long byteSize)
+    {
+        var limit = _cachedSettings?.MaxClipboardItemBytes ?? 0;
+        return ClipboardCaptureSizeGuard.IsWithinLimit(byteSize, limit);
+    }
+
     public async Task RefreshCachedPrivacySettingsAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -234,6 +240,14 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
                 return;
             }
 
+            var byteSize = Encoding.UTF8.GetByteCount(text);
+            if (!IsWithinSizeLimit(byteSize))
+            {
+                _logger.LogDebug(
+                    "Clipboard text dropped: size {Bytes}B exceeds configured limit.", byteSize);
+                return;
+            }
+
             var formats = CaptureTextFormats(text);
             var item = CreateTextItem(text, formats);
             if (!_privacyFilter.ShouldCapture(item, _cachedSettings))
@@ -285,6 +299,14 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
             if (hash == _lastContentHash)
             {
                 _logger.LogDebug("Clipboard file drop ignored: duplicate hash {Hash}.", hash);
+                return true;
+            }
+
+            var byteSize = Encoding.UTF8.GetByteCount(content);
+            if (!IsWithinSizeLimit(byteSize))
+            {
+                _logger.LogDebug(
+                    "Clipboard file drop dropped: size {Bytes}B exceeds configured limit.", byteSize);
                 return true;
             }
 
@@ -348,6 +370,17 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
             var width = bitmap.PixelWidth;
             var height = bitmap.PixelHeight;
             var estimatedSize = ImageClipboardMetadataHelper.EstimateRgbaByteSize(width, height);
+
+            // Reject oversize images before writing to the preview cache so we
+            // don't orphan a cache file on disk.
+            if (!IsWithinSizeLimit(estimatedSize))
+            {
+                _logger.LogDebug(
+                    "Clipboard image dropped: estimated size {Bytes}B exceeds configured limit ({Width}x{Height}).",
+                    estimatedSize, width, height);
+                return true;
+            }
+
             var title = ImageClipboardMetadataHelper.CreateTitle(width, height);
             var previewText = ImageClipboardMetadataHelper.CreatePreviewText(width, height, estimatedSize);
 
