@@ -327,8 +327,7 @@
                                     </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Button Content="{Binding Label}"
-                                                    Margin="0,0,4,4"
+                                            <Button Margin="0,0,4,4"
                                                     Style="{StaticResource FilterChipStyle}"
                                                     Command="{Binding DataContext.SelectContentTypeFilterCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                     CommandParameter="{Binding}" />

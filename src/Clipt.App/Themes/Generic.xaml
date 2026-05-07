@@ -70,20 +70,31 @@
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="999"
                             Padding="{TemplateBinding Padding}">
-                        <TextBlock x:Name="ChipText"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   FontFamily="{TemplateBinding FontFamily}"
-                                   FontSize="{TemplateBinding FontSize}"
-                                   FontWeight="{TemplateBinding FontWeight}"
-                                   Foreground="{TemplateBinding Foreground}"
-                                   Text="{TemplateBinding Content}" />
+                        <StackPanel Orientation="Horizontal"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center">
+                            <TextBlock x:Name="ChipText"
+                                       FontFamily="{TemplateBinding FontFamily}"
+                                       FontSize="{TemplateBinding FontSize}"
+                                       FontWeight="{TemplateBinding FontWeight}"
+                                       Foreground="{TemplateBinding Foreground}"
+                                       Text="{Binding Label}" />
+                            <TextBlock x:Name="ChipCount"
+                                       Margin="4,0,0,0"
+                                       FontFamily="{TemplateBinding FontFamily}"
+                                       FontSize="10"
+                                       FontWeight="Normal"
+                                       Foreground="{DynamicResource Clipt.Brush.TextMuted}"
+                                       Text="{Binding Count}" />
+                        </StackPanel>
                     </Border>
                     <ControlTemplate.Triggers>
                         <DataTrigger Binding="{Binding IsSelected}" Value="True">
                             <Setter TargetName="ChipBorder" Property="Background" Value="{DynamicResource Clipt.Brush.AccentSoft}" />
                             <Setter TargetName="ChipBorder" Property="BorderBrush" Value="{DynamicResource Clipt.Brush.Accent}" />
                             <Setter TargetName="ChipText" Property="Foreground" Value="{DynamicResource Clipt.Brush.Accent}" />
+                            <Setter TargetName="ChipCount" Property="Foreground" Value="{DynamicResource Clipt.Brush.Accent}" />
+                            <Setter TargetName="ChipCount" Property="Opacity" Value="0.65" />
                         </DataTrigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="ChipBorder" Property="Background" Value="#262629" />

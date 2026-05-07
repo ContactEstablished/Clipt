@@ -114,10 +114,12 @@ public sealed partial class MainViewModel : ObservableObject
             var demoItems = DesignTimeData.GetSampleItems();
             _demoItems = [.. demoItems];
             _isDemoFallback = true;
+            UpdateContentTypeFilterCounts(demoItems);
             PopulateItems(demoItems);
         }
         else
         {
+            UpdateContentTypeFilterCounts(items);
             PopulateItems(items);
         }
 
@@ -210,8 +212,9 @@ public sealed partial class MainViewModel : ObservableObject
                 _demoItems[idx] = _demoItems[idx] with { IsPinned = !_demoItems[idx].IsPinned };
             }
 
-            var filtered = _searchService.Filter(_demoItems, SearchText);
-            PopulateItems(ApplyContentTypeFilter(filtered));
+            var baseItems = _searchService.Filter(_demoItems, SearchText);
+            UpdateContentTypeFilterCounts(baseItems);
+            PopulateItems(ApplyContentTypeFilter(baseItems));
             SelectedItem = Items.FirstOrDefault(i => i.Id == item.Id);
             return;
         }
@@ -262,15 +265,17 @@ public sealed partial class MainViewModel : ObservableObject
 
         if (_isDemoFallback)
         {
-            var results = _searchService.Filter(_demoItems, query);
-            PopulateItems(ApplyContentTypeFilter(results));
+            var baseItems = _searchService.Filter(_demoItems, query);
+            UpdateContentTypeFilterCounts(baseItems);
+            PopulateItems(ApplyContentTypeFilter(baseItems));
             return;
         }
 
         try
         {
-            var results = await _historyService.SearchAsync(query, token);
-            PopulateItems(ApplyContentTypeFilter(results));
+            var baseItems = await _historyService.SearchAsync(query, token);
+            UpdateContentTypeFilterCounts(baseItems);
+            PopulateItems(ApplyContentTypeFilter(baseItems));
         }
         catch (OperationCanceledException)
         {
@@ -299,19 +304,31 @@ public sealed partial class MainViewModel : ObservableObject
     {
         if (_isDemoFallback)
         {
-            var filtered = _searchService.Filter(_demoItems, SearchText);
-            PopulateItems(ApplyContentTypeFilter(filtered));
+            var baseItems = _searchService.Filter(_demoItems, SearchText);
+            UpdateContentTypeFilterCounts(baseItems);
+            PopulateItems(ApplyContentTypeFilter(baseItems));
             return;
         }
 
         try
         {
-            var results = await _historyService.SearchAsync(SearchText, CancellationToken.None);
-            PopulateItems(ApplyContentTypeFilter(results));
+            var baseItems = await _historyService.SearchAsync(SearchText, CancellationToken.None);
+            UpdateContentTypeFilterCounts(baseItems);
+            PopulateItems(ApplyContentTypeFilter(baseItems));
         }
         catch (Exception exception)
         {
             _logger.LogError(exception, "Failed to refresh items.");
+        }
+    }
+
+    private void UpdateContentTypeFilterCounts(IReadOnlyList<ClipboardItem> baseItems)
+    {
+        foreach (var filter in ContentTypeFilters)
+        {
+            filter.Count = filter.ContentType is null
+                ? baseItems.Count
+                : baseItems.Count(i => i.ContentType == filter.ContentType.Value);
         }
     }
 
@@ -421,6 +438,8 @@ public sealed partial class MainViewModel : ObservableObject
             Items.Remove(existing);
         }
 
+        await RefreshContentTypeFilterCountsAsync();
+
         if (!MatchesActiveContentTypeFilter(savedItem))
         {
             SelectedItem = Items.FirstOrDefault();
@@ -435,5 +454,18 @@ public sealed partial class MainViewModel : ObservableObject
     private bool MatchesActiveContentTypeFilter(ClipboardItem item)
     {
         return ActiveContentTypeFilter is null || item.ContentType == ActiveContentTypeFilter.Value;
+    }
+
+    private async Task RefreshContentTypeFilterCountsAsync()
+    {
+        try
+        {
+            var baseItems = await _historyService.SearchAsync(SearchText, CancellationToken.None);
+            UpdateContentTypeFilterCounts(baseItems);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Failed to refresh content type filter counts.");
+        }
     }
 }

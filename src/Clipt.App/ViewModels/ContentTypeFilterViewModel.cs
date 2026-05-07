@@ -17,4 +17,7 @@ public sealed partial class ContentTypeFilterViewModel : ObservableObject
 
     [ObservableProperty]
     public partial bool IsSelected { get; set; }
+
+    [ObservableProperty]
+    public partial int Count { get; set; }
 }
