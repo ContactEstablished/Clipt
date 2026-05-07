@@ -1,6 +1,7 @@
 <Window x:Class="Clipt.App.Views.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:Clipt.App.Controls"
         Title="Settings"
         Width="640"
         Height="460"
@@ -201,17 +202,8 @@
                         <TextBlock Foreground="{DynamicResource Clipt.Brush.TextSecondary}"
                                    TextWrapping="Wrap"
                                    Margin="0,0,0,10"
-                                   Text="Example: Ctrl+Shift+V. Uses modifiers (Ctrl, Alt, Shift, Win) plus one key name recognized by WPF." />
-                        <TextBox MinHeight="36"
-                                 VerticalContentAlignment="Center"
-                                 Foreground="{DynamicResource Clipt.Brush.Text}"
-                                 Background="#1C1C20"
-                                 BorderBrush="{DynamicResource Clipt.Brush.Border}"
-                                 BorderThickness="1"
-                                 Padding="10,6"
-                                 CaretBrush="{DynamicResource Clipt.Brush.Accent}"
-                                 FontFamily="{StaticResource Clipt.Font.Mono}"
-                                 Text="{Binding OpenHotkeyText, UpdateSourceTrigger=PropertyChanged}" />
+                                   Text="Click the field, then press modifiers (Ctrl, Alt, Shift, Win) plus one key." />
+                        <controls:HotkeyCaptureControl HotkeyText="{Binding OpenHotkeyText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
