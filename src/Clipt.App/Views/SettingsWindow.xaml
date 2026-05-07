@@ -188,9 +188,26 @@
                                  FontFamily="{StaticResource Clipt.Font.Mono}"
                                  FontSize="12"
                                  Text="{Binding IgnoredAppNamesText, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Margin="0,12,0,6"
-                                   Foreground="{DynamicResource Clipt.Brush.TextSecondary}"
-                                   Text="Ignored app paths" />
+                        <Grid Margin="0,12,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource Clipt.Brush.TextSecondary}"
+                                       Text="Ignored app paths" />
+                            <Button Grid.Column="1"
+                                    Padding="10,4"
+                                    VerticalAlignment="Center"
+                                    Background="Transparent"
+                                    BorderBrush="Transparent"
+                                    Foreground="{DynamicResource Clipt.Brush.Accent}"
+                                    Cursor="Hand"
+                                    Content="Browse…"
+                                    Command="{Binding BrowseForIgnoredAppPathCommand}"
+                                    ToolTip="Pick an executable to add its path to the list." />
+                        </Grid>
                         <TextBox AcceptsReturn="True"
                                  TextWrapping="Wrap"
                                  VerticalScrollBarVisibility="Auto"

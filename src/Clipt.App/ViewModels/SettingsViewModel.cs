@@ -9,6 +9,7 @@ using Clipt.Core.Models;
 using Clipt.Core.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Win32;
 
 namespace Clipt.App.ViewModels;
 
@@ -155,9 +156,9 @@ public sealed partial class SettingsViewModel : ObservableObject
             MaxHistoryItems = maxHistory,
             AutoPruneAfterDays = autoPruneAfterDays,
             MaxClipboardItemBytes = maxClipBytes,
-            IgnoredAppNames = SplitLines(IgnoredAppNamesText),
-            IgnoredAppPaths = SplitLines(IgnoredAppPathsText),
-            IgnoredPatterns = SplitLines(IgnoredPatternsText),
+            IgnoredAppNames = PrivacyEntryNormalizer.Normalize(SplitLines(IgnoredAppNamesText)),
+            IgnoredAppPaths = PrivacyEntryNormalizer.Normalize(SplitLines(IgnoredAppPathsText)),
+            IgnoredPatterns = PrivacyEntryNormalizer.Normalize(SplitLines(IgnoredPatternsText)),
             HonorClipboardViewerIgnore = _baseline.HonorClipboardViewerIgnore,
             OpenHotkey = hotkey,
         };
@@ -253,6 +254,49 @@ public sealed partial class SettingsViewModel : ObservableObject
     }
 
     private const string DefaultOpenHotkey = "Ctrl+Shift+V";
+
+    /// <summary>
+    /// Opens an Open File dialog so the user can pick an executable to add
+    /// to the Ignored app paths list. The selected path is appended to the
+    /// existing textbox value; manual edits are preserved. Save still
+    /// required to persist, and the entry is normalized at save time.
+    /// </summary>
+    [RelayCommand]
+    private void BrowseForIgnoredAppPath()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Select an application to ignore",
+            Filter = "Executables (*.exe)|*.exe|All files (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false,
+        };
+
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        var picked = dialog.FileName;
+        if (string.IsNullOrWhiteSpace(picked))
+        {
+            return;
+        }
+
+        // Append to the existing free-text content so manual edits in the
+        // textbox above the new entry are preserved verbatim.
+        var current = IgnoredAppPathsText ?? string.Empty;
+        if (current.Length == 0)
+        {
+            IgnoredAppPathsText = picked;
+            return;
+        }
+
+        var separator = current.EndsWith('\n') || current.EndsWith('\r')
+            ? string.Empty
+            : Environment.NewLine;
+        IgnoredAppPathsText = current + separator + picked;
+    }
 
     private const long BytesPerMegabyte = 1_048_576;
 
