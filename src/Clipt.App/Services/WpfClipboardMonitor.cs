@@ -240,15 +240,20 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
                 return;
             }
 
-            var byteSize = Encoding.UTF8.GetByteCount(text);
-            if (!IsWithinSizeLimit(byteSize))
+            // Capture all text-related formats (Unicode + ANSI + HTML + RTF)
+            // before applying the size guard so the cap covers every payload
+            // we would persist — not just the Unicode variant. Browser/Word
+            // copies routinely have small Unicode text but very large HTML/RTF.
+            var formats = CaptureTextFormats(text);
+            var totalBytes = ClipboardFormatHelper.SumPayloadBytes(formats);
+            if (!IsWithinSizeLimit(totalBytes))
             {
                 _logger.LogDebug(
-                    "Clipboard text dropped: size {Bytes}B exceeds configured limit.", byteSize);
+                    "Clipboard text dropped: total payload {Bytes}B across {Count} format(s) exceeds configured limit.",
+                    totalBytes, formats.Count);
                 return;
             }
 
-            var formats = CaptureTextFormats(text);
             var item = CreateTextItem(text, formats);
             if (!_privacyFilter.ShouldCapture(item, _cachedSettings))
             {
