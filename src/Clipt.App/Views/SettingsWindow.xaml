@@ -247,7 +247,26 @@
                                    TextWrapping="Wrap"
                                    Margin="0,0,0,10"
                                    Text="Click the field, then press modifiers (Ctrl, Alt, Shift, Win) plus one key." />
-                        <controls:HotkeyCaptureControl HotkeyText="{Binding OpenHotkeyText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <controls:HotkeyCaptureControl
+                                Grid.Column="0"
+                                HotkeyText="{Binding OpenHotkeyText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <Button Grid.Column="1"
+                                    Margin="10,0,0,0"
+                                    Padding="10,6"
+                                    VerticalAlignment="Center"
+                                    Background="Transparent"
+                                    BorderBrush="Transparent"
+                                    Foreground="{DynamicResource Clipt.Brush.Accent}"
+                                    Cursor="Hand"
+                                    Content="Reset"
+                                    Command="{Binding ResetOpenHotkeyCommand}"
+                                    ToolTip="Reset to Ctrl+Shift+V" />
+                        </Grid>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

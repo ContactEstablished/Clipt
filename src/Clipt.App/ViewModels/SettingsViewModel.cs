@@ -242,6 +242,18 @@ public sealed partial class SettingsViewModel : ObservableObject
         CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>
+    /// Resets the open-hotkey field to the project default. The new value is
+    /// not persisted until the user clicks Save.
+    /// </summary>
+    [RelayCommand]
+    private void ResetOpenHotkey()
+    {
+        OpenHotkeyText = DefaultOpenHotkey;
+    }
+
+    private const string DefaultOpenHotkey = "Ctrl+Shift+V";
+
     private const long BytesPerMegabyte = 1_048_576;
 
     private static string FormatBytesAsMegabytes(int bytes)
