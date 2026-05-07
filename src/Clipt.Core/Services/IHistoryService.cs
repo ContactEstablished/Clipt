@@ -28,4 +28,10 @@ public interface IHistoryService
     /// </summary>
     /// <param name="maxItems">Maximum number of unpinned items to keep. Values &lt;= 0 disable pruning.</param>
     Task<HistoryDeletionResult> PruneUnpinnedAsync(int maxItems, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Returns all persisted image preview URIs from clipboard items that have an image_uri.
+    /// Used on startup to reconcile the preview cache against the database.
+    /// </summary>
+    Task<IReadOnlyList<string>> GetImageUrisAsync(CancellationToken cancellationToken);
 }

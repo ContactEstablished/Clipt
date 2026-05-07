@@ -476,6 +476,33 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
         }
     }
 
+    public async Task<IReadOnlyList<string>> GetImageUrisAsync(CancellationToken cancellationToken)
+    {
+        await _connectionLock.WaitAsync(cancellationToken);
+        try
+        {
+            var connection = await GetConnectionAsync(cancellationToken);
+
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT image_uri FROM clipboard_items WHERE image_uri IS NOT NULL";
+
+            var uris = new List<string>();
+            await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+            {
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    uris.Add(reader.GetString(0));
+                }
+            }
+
+            return uris;
+        }
+        finally
+        {
+            _connectionLock.Release();
+        }
+    }
+
     public void Dispose()
     {
         if (_isDisposed)

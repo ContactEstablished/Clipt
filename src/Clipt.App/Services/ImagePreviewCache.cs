@@ -126,6 +126,84 @@ public sealed class ImagePreviewCache
         return null;
     }
 
+    /// <summary>
+    /// Result of a preview cache reconciliation.
+    /// </summary>
+    /// <param name="Scanned">Number of PNG files found in the cache directory.</param>
+    /// <param name="Deleted">Number of orphaned PNG files that were deleted.</param>
+    /// <param name="Skipped">Number of files skipped (e.g. outside cache directory, in use, or errors).</param>
+    public readonly record struct CacheReconciliationResult(int Scanned, int Deleted, int Skipped);
+
+    /// <summary>
+    /// Removes orphaned PNG preview files from the cache directory that are not
+    /// referenced by any clipboard item image_uri in the database.
+    /// Only deletes .png files that reside inside the preview cache directory.
+    /// </summary>
+    /// <param name="referencedImageUris">The set of image URIs currently persisted in the database.</param>
+    public CacheReconciliationResult ReconcileCache(IReadOnlySet<string> referencedImageUris)
+    {
+        // Build a set of normalized local paths from the referenced URIs.
+        var referencedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var uri in referencedImageUris)
+        {
+            var localPath = UriToLocalPath(uri);
+            if (localPath is not null)
+            {
+                try
+                {
+                    referencedPaths.Add(Path.GetFullPath(localPath));
+                }
+                catch
+                {
+                    // Malformed path — skip.
+                }
+            }
+        }
+
+        if (!Directory.Exists(_cacheDirectory))
+        {
+            return new CacheReconciliationResult(0, 0, 0);
+        }
+
+        var pngFiles = Directory.GetFiles(_cacheDirectory, "*.png");
+        var scanned = pngFiles.Length;
+        var deleted = 0;
+        var skipped = 0;
+
+        foreach (var file in pngFiles)
+        {
+            try
+            {
+                var fullPath = Path.GetFullPath(file);
+                if (!IsInsideCacheDirectory(fullPath))
+                {
+                    _logger.LogWarning(
+                        "Skipping file outside cache directory during reconciliation: '{Path}'.", fullPath);
+                    skipped++;
+                    continue;
+                }
+
+                if (!referencedPaths.Contains(fullPath))
+                {
+                    File.Delete(fullPath);
+                    deleted++;
+                    _logger.LogDebug("Reconciliation deleted orphaned cache file '{Path}'.", fullPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to process cache file during reconciliation: '{Path}'.", file);
+                skipped++;
+            }
+        }
+
+        _logger.LogInformation(
+            "Preview cache reconciliation complete: {Scanned} scanned, {Deleted} deleted, {Skipped} skipped.",
+            scanned, deleted, skipped);
+
+        return new CacheReconciliationResult(scanned, deleted, skipped);
+    }
+
     private bool IsInsideCacheDirectory(string localPath)
     {
         var fullPath = Path.GetFullPath(localPath);

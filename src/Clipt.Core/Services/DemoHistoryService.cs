@@ -61,4 +61,10 @@ public sealed class DemoHistoryService : IHistoryService
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(HistoryDeletionResult.Empty);
     }
+
+    public Task<IReadOnlyList<string>> GetImageUrisAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult<IReadOnlyList<string>>([]);
+    }
 }

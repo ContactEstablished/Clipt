@@ -1274,6 +1274,93 @@ public sealed class ClipboardRepositoryTests : IAsyncDisposable
         remaining.Should().Contain(i => i.Id == middleImage.Id && i.ImageUri == survivingImageUri);
     }
 
+    // ── GetImageUrisAsync ────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetImageUrisAsync_ReturnsPersistedImageUris()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        const string uri1 = "file:///C:/cache/preview-cache/img_test_a.png";
+        const string uri2 = "file:///C:/cache/preview-cache/img_test_b.png";
+
+        var item1 = CreateTestItem("Image A") with
+        {
+            ContentType = ContentType.Image,
+            ImageUri = uri1,
+        };
+        var item2 = CreateTestItem("Image B", isPinned: true) with
+        {
+            ContentType = ContentType.Image,
+            ImageUri = uri2,
+        };
+
+        await _repository.SaveAsync(item1, CancellationToken.None);
+        await _repository.SaveAsync(item2, CancellationToken.None);
+
+        var uris = await _repository.GetImageUrisAsync(CancellationToken.None);
+
+        uris.Should().HaveCount(2);
+        uris.Should().Contain(uri1);
+        uris.Should().Contain(uri2);
+    }
+
+    [Fact]
+    public async Task GetImageUrisAsync_ExcludesNullImageUri()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var textItem = CreateTestItem("Text only");
+        var imageItem = CreateTestItem("Image") with
+        {
+            ContentType = ContentType.Image,
+            ImageUri = "file:///C:/cache/preview-cache/img_test_c.png",
+        };
+
+        await _repository.SaveAsync(textItem, CancellationToken.None);
+        await _repository.SaveAsync(imageItem, CancellationToken.None);
+
+        var uris = await _repository.GetImageUrisAsync(CancellationToken.None);
+
+        uris.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task GetImageUrisAsync_EmptyTable_ReturnsEmptyList()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var uris = await _repository.GetImageUrisAsync(CancellationToken.None);
+
+        uris.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetImageUrisAsync_IncludesPinnedAndUnpinned()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var pinned = CreateTestItem("Pinned image", isPinned: true) with
+        {
+            ContentType = ContentType.Image,
+            ImageUri = "file:///C:/cache/preview-cache/img_pinned.png",
+        };
+        var unpinned = CreateTestItem("Unpinned image") with
+        {
+            ContentType = ContentType.Image,
+            ImageUri = "file:///C:/cache/preview-cache/img_unpinned.png",
+        };
+
+        await _repository.SaveAsync(pinned, CancellationToken.None);
+        await _repository.SaveAsync(unpinned, CancellationToken.None);
+
+        var uris = await _repository.GetImageUrisAsync(CancellationToken.None);
+
+        uris.Should().HaveCount(2);
+        uris.Should().Contain("file:///C:/cache/preview-cache/img_pinned.png");
+        uris.Should().Contain("file:///C:/cache/preview-cache/img_unpinned.png");
+    }
+
     public async ValueTask DisposeAsync()
     {
         _repository.Dispose();
