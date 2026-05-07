@@ -51,6 +51,52 @@
         <Setter Property="ToolTipService.InitialShowDelay" Value="350" />
     </Style>
 
+    <Style x:Key="FilterChipStyle" TargetType="{x:Type Button}">
+        <Setter Property="Padding" Value="9,4" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Background" Value="{DynamicResource Clipt.Brush.SurfaceAlt}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Clipt.Brush.Border}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Foreground" Value="{DynamicResource Clipt.Brush.TextSecondary}" />
+        <Setter Property="FontFamily" Value="{StaticResource Clipt.Font.Ui}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <Border x:Name="ChipBorder"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="999"
+                            Padding="{TemplateBinding Padding}">
+                        <TextBlock x:Name="ChipText"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   FontFamily="{TemplateBinding FontFamily}"
+                                   FontSize="{TemplateBinding FontSize}"
+                                   FontWeight="{TemplateBinding FontWeight}"
+                                   Foreground="{TemplateBinding Foreground}"
+                                   Text="{TemplateBinding Content}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                            <Setter TargetName="ChipBorder" Property="Background" Value="{DynamicResource Clipt.Brush.AccentSoft}" />
+                            <Setter TargetName="ChipBorder" Property="BorderBrush" Value="{DynamicResource Clipt.Brush.Accent}" />
+                            <Setter TargetName="ChipText" Property="Foreground" Value="{DynamicResource Clipt.Brush.Accent}" />
+                        </DataTrigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="ChipBorder" Property="Background" Value="#262629" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="ChipBorder" Property="Background" Value="#34343A" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="SearchBoxStyle" TargetType="{x:Type TextBox}">
         <Setter Property="Height" Value="36" />
         <Setter Property="Padding" Value="34,0,12,0" />

@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Linq;
 using System.Windows.Data;
 using Clipt.App.Services;
 using Clipt.Core;
@@ -61,11 +62,16 @@ public sealed partial class MainViewModel : ObservableObject
 
     public ICollectionView ItemsView { get; }
 
+    public IReadOnlyList<ContentTypeFilterViewModel> ContentTypeFilters { get; } = BuildContentTypeFilters();
+
     [ObservableProperty]
     public partial ClipboardItemViewModel? SelectedItem { get; set; }
 
     [ObservableProperty]
     public partial string SearchText { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial ContentType? ActiveContentTypeFilter { get; set; }
 
     [ObservableProperty]
     public partial bool IsWorkMode { get; set; }
@@ -205,7 +211,7 @@ public sealed partial class MainViewModel : ObservableObject
             }
 
             var filtered = _searchService.Filter(_demoItems, SearchText);
-            PopulateItems(filtered);
+            PopulateItems(ApplyContentTypeFilter(filtered));
             SelectedItem = Items.FirstOrDefault(i => i.Id == item.Id);
             return;
         }
@@ -257,14 +263,14 @@ public sealed partial class MainViewModel : ObservableObject
         if (_isDemoFallback)
         {
             var results = _searchService.Filter(_demoItems, query);
-            PopulateItems(results);
+            PopulateItems(ApplyContentTypeFilter(results));
             return;
         }
 
         try
         {
             var results = await _historyService.SearchAsync(query, token);
-            PopulateItems(results);
+            PopulateItems(ApplyContentTypeFilter(results));
         }
         catch (OperationCanceledException)
         {
@@ -294,19 +300,63 @@ public sealed partial class MainViewModel : ObservableObject
         if (_isDemoFallback)
         {
             var filtered = _searchService.Filter(_demoItems, SearchText);
-            PopulateItems(filtered);
+            PopulateItems(ApplyContentTypeFilter(filtered));
             return;
         }
 
         try
         {
             var results = await _historyService.SearchAsync(SearchText, CancellationToken.None);
-            PopulateItems(results);
+            PopulateItems(ApplyContentTypeFilter(results));
         }
         catch (Exception exception)
         {
             _logger.LogError(exception, "Failed to refresh items.");
         }
+    }
+
+    [RelayCommand]
+    private async Task SelectContentTypeFilter(ContentTypeFilterViewModel? filter)
+    {
+        if (filter is null)
+        {
+            return;
+        }
+
+        foreach (var f in ContentTypeFilters)
+        {
+            f.IsSelected = f == filter;
+        }
+
+        ActiveContentTypeFilter = filter.ContentType;
+        await RefreshItemsAsync();
+    }
+
+    private static IReadOnlyList<ContentTypeFilterViewModel> BuildContentTypeFilters()
+    {
+        return
+        [
+            new ContentTypeFilterViewModel("All", null) { IsSelected = true },
+            new ContentTypeFilterViewModel("Text", ContentType.Text),
+            new ContentTypeFilterViewModel("Code", ContentType.Code),
+            new ContentTypeFilterViewModel("Markdown", ContentType.Markdown),
+            new ContentTypeFilterViewModel("JSON", ContentType.Json),
+            new ContentTypeFilterViewModel("URL", ContentType.Url),
+            new ContentTypeFilterViewModel("Files", ContentType.File),
+            new ContentTypeFilterViewModel("Images", ContentType.Image),
+            new ContentTypeFilterViewModel("Color", ContentType.Color),
+        ];
+    }
+
+    private IReadOnlyList<ClipboardItem> ApplyContentTypeFilter(IReadOnlyList<ClipboardItem> items)
+    {
+        if (ActiveContentTypeFilter is null)
+        {
+            return items;
+        }
+
+        var type = ActiveContentTypeFilter.Value;
+        return items.Where(i => i.ContentType == type).ToList();
     }
 
     private ClipboardItemViewModel? GetNextSelectionAfterDelete()
@@ -371,8 +421,19 @@ public sealed partial class MainViewModel : ObservableObject
             Items.Remove(existing);
         }
 
+        if (!MatchesActiveContentTypeFilter(savedItem))
+        {
+            SelectedItem = Items.FirstOrDefault();
+            return;
+        }
+
         var viewModel = new ClipboardItemViewModel(savedItem);
         Items.Insert(0, viewModel);
         SelectedItem = viewModel;
+    }
+
+    private bool MatchesActiveContentTypeFilter(ClipboardItem item)
+    {
+        return ActiveContentTypeFilter is null || item.ContentType == ActiveContentTypeFilter.Value;
     }
 }

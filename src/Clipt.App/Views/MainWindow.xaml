@@ -307,16 +307,36 @@
                             <Grid Grid.Column="0" Margin="14,0,12,14">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
                                     <RowDefinition Height="*" />
                                 </Grid.RowDefinitions>
 
                                 <TextBox x:Name="SearchBox"
                                          Grid.Row="0"
-                                         Margin="0,0,0,12"
+                                         Margin="0,0,0,8"
                                          Style="{StaticResource SearchBoxStyle}"
                                          Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
 
-                                <ListBox Grid.Row="1"
+                                <ItemsControl Grid.Row="1"
+                                              Margin="0,0,0,8"
+                                              ItemsSource="{Binding ContentTypeFilters}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel Orientation="Horizontal" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Content="{Binding Label}"
+                                                    Margin="0,0,4,4"
+                                                    Style="{StaticResource FilterChipStyle}"
+                                                    Command="{Binding DataContext.SelectContentTypeFilterCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    CommandParameter="{Binding}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <ListBox Grid.Row="2"
                                          Background="Transparent"
                                          BorderThickness="0"
                                          ItemsSource="{Binding ItemsView}"
