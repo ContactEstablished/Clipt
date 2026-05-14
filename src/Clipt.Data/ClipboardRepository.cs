@@ -192,7 +192,8 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
             await using var checkReader = await checkCommand.ExecuteReaderAsync(cancellationToken);
             if (await checkReader.ReadAsync(cancellationToken))
             {
-                // Duplicate found: update last_used_at and use_count, return existing item.
+                // Duplicate found: refresh recency, update last_used_at/use_count,
+                // and return the existing item.
                 // The UPDATE trigger (trg_clipboard_items_fts_au) keeps FTS in sync automatically.
                 // Formats are not replaced on duplicate — the original capture's formats
                 // are preserved. This is acceptable for now since duplicate content
@@ -207,17 +208,20 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
                 using var updateCommand = connection.CreateCommand();
                 updateCommand.CommandText = """
                     UPDATE clipboard_items
-                    SET last_used_at = @last_used_at,
+                    SET created_at = @created_at,
+                        last_used_at = @last_used_at,
                         use_count = use_count + 1
                     WHERE content_hash = @hash
                     """;
+                updateCommand.Parameters.AddWithValue("@created_at", now);
                 updateCommand.Parameters.AddWithValue("@last_used_at", now);
                 updateCommand.Parameters.AddWithValue("@hash", item.ContentHash);
                 await updateCommand.ExecuteNonQueryAsync(cancellationToken);
 
-                _logger.LogDebug("Updated duplicate clipboard item {Hash}, use count incremented.", item.ContentHash);
+                _logger.LogDebug("Updated duplicate clipboard item {Hash}, refreshed recency and incremented use count.", item.ContentHash);
                 return existingItem with
                 {
+                    CreatedAt = DateTimeOffset.FromUnixTimeMilliseconds(now),
                     LastUsedAt = DateTimeOffset.FromUnixTimeMilliseconds(now),
                     UseCount = existingItem.UseCount + 1,
                 };

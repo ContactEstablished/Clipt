@@ -146,6 +146,33 @@ public sealed class ClipboardRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task SaveAsync_DuplicateContentHash_MovesExistingItemToTop()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        var now = DateTimeOffset.UtcNow;
+        var original = CreateTestItem("Duplicate recency") with { CreatedAt = now.AddHours(-2), LastUsedAt = now.AddHours(-2) };
+        var newer = CreateTestItem("Newer item") with { CreatedAt = now.AddHours(-1), LastUsedAt = now.AddHours(-1) };
+
+        await _repository.SaveAsync(original, CancellationToken.None);
+        await _repository.SaveAsync(newer, CancellationToken.None);
+
+        var before = await _repository.GetItemsAsync(CancellationToken.None);
+        before[0].Id.Should().Be(newer.Id);
+
+        var duplicate = CreateTestItem("Duplicate recency");
+        var savedDuplicate = await _repository.SaveAsync(duplicate, CancellationToken.None);
+
+        savedDuplicate.Id.Should().Be(original.Id);
+        savedDuplicate.CreatedAt.Should().BeAfter(original.CreatedAt);
+
+        var after = await _repository.GetItemsAsync(CancellationToken.None);
+        after.Should().HaveCount(2);
+        after[0].Id.Should().Be(original.Id, "recapturing existing content should make it the most recent unpinned item");
+        after[1].Id.Should().Be(newer.Id);
+    }
+
+    [Fact]
     public async Task GetItemsAsync_ReturnsItemsOrderedByPinnedThenCreatedAt()
     {
         await _migrationRunner.RunAsync(CancellationToken.None);

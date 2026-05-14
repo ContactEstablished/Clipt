@@ -274,7 +274,7 @@ Current implementation snapshot: the app now has a working WPF shell, SQLite per
 - [x] Detect and skip clipboard content with `CF_CLIPBOARD_VIEWER_IGNORE` flag (password managers)
 - [x] Identify source application via `GetForegroundWindow` + process info
 - [x] Hash-based duplicate detection updates existing entries instead of inserting duplicates
-- [ ] Move existing duplicate entries to the top of history when recaptured
+- [x] Move existing duplicate entries to the top of history when recaptured
 - [x] Configurable max history size with auto-pruning of oldest unpinned items
 - [x] Configurable per-clip size limit covering captured payloads
 
