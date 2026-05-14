@@ -340,7 +340,7 @@ The window has two distinct modes that match the two main use cases for a clipbo
 
 ### Search
 - [x] FTS5 full-text search over preview_text
-- [ ] Fuzzy matching (FTS5 doesn't do fuzzy natively — use trigram extension or fallback to LIKE for short queries)
+- [x] Fuzzy matching (FTS5 doesn't do fuzzy natively — use trigram extension or fallback to LIKE for short queries)
 - [x] Filter chips: All, Text, Markdown, Code, JSON, URLs, Images, Files, Color
 - [x] Pinned filter chip
 - [ ] Search history within the search box

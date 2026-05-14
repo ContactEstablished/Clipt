@@ -314,6 +314,48 @@ public sealed class ClipboardRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task SearchAsync_ShortQuery_UsesLikeFallbackForSubstringMatch()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        await _repository.SaveAsync(CreateTestItem("API client with LP token"), CancellationToken.None);
+        await _repository.SaveAsync(CreateTestItem("Unrelated item"), CancellationToken.None);
+
+        var results = await _repository.SearchAsync("LP", CancellationToken.None);
+
+        results.Should().ContainSingle();
+        results[0].Title.Should().Be("API client with LP token");
+    }
+
+    [Fact]
+    public async Task SearchAsync_SymbolHeavyQuery_UsesLikeFallback()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        await _repository.SaveAsync(CreateTestItem("#14B8A6", contentType: ContentType.Color), CancellationToken.None);
+        await _repository.SaveAsync(CreateTestItem("#0F172A", contentType: ContentType.Color), CancellationToken.None);
+
+        var results = await _repository.SearchAsync("#14B8A6", CancellationToken.None);
+
+        results.Should().ContainSingle();
+        results[0].Content.Should().Be("#14B8A6");
+    }
+
+    [Fact]
+    public async Task SearchAsync_LikeFallback_EscapesWildcardCharacters()
+    {
+        await _migrationRunner.RunAsync(CancellationToken.None);
+
+        await _repository.SaveAsync(CreateTestItem("Discount is 50% today"), CancellationToken.None);
+        await _repository.SaveAsync(CreateTestItem("A normal unrelated row"), CancellationToken.None);
+
+        var literalPercentResults = await _repository.SearchAsync("%", CancellationToken.None);
+
+        literalPercentResults.Should().ContainSingle();
+        literalPercentResults[0].Content.Should().Be("Discount is 50% today");
+    }
+
+    [Fact]
     public async Task SetPinnedAsync_PinsItem()
     {
         await _migrationRunner.RunAsync(CancellationToken.None);

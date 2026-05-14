@@ -9,6 +9,8 @@ namespace Clipt.Data;
 
 public sealed partial class ClipboardRepository : IHistoryService, IDisposable
 {
+    private const int ShortSearchQueryLength = 2;
+
     private readonly DatabasePathProvider _pathProvider;
     private readonly ILogger<ClipboardRepository> _logger;
     private readonly SemaphoreSlim _connectionLock = new(1, 1);
@@ -89,51 +91,20 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
         }
 
         var ftsQuery = BuildFtsQuery(query);
-        if (string.IsNullOrEmpty(ftsQuery))
-        {
-            return await GetItemsAsync(cancellationToken);
-        }
+        var useLikeFallbackOnly = string.IsNullOrEmpty(ftsQuery) || ShouldPreferLikeFallback(query);
 
         await _connectionLock.WaitAsync(cancellationToken);
         try
         {
             var connection = await GetConnectionAsync(cancellationToken);
 
-            using var command = connection.CreateCommand();
-            command.CommandText = """
-                SELECT
-                    id,
-                    content_hash,
-                    content_type,
-                    title,
-                    preview_text,
-                    content_text,
-                    source_app_name,
-                    source_app_path,
-                    byte_size,
-                    is_pinned,
-                    pin_order,
-                    is_favorite,
-                    created_at,
-                    last_used_at,
-                    use_count,
-                    image_uri
-                FROM clipboard_items
-                WHERE id IN (
-                    SELECT item_id FROM clipboard_items_fts
-                    WHERE clipboard_items_fts MATCH @query
-                )
-                ORDER BY is_pinned DESC, pin_order, created_at DESC
-                """;
-            command.Parameters.AddWithValue("@query", ftsQuery);
+            var items = useLikeFallbackOnly
+                ? await SearchWithLikeAsync(connection, query, cancellationToken)
+                : await SearchWithFtsAsync(connection, ftsQuery, cancellationToken);
 
-            var items = new List<ClipboardItem>();
-            await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+            if (!useLikeFallbackOnly && items.Count == 0)
             {
-                while (await reader.ReadAsync(cancellationToken))
-                {
-                    items.Add(MapRow(reader));
-                }
+                items = await SearchWithLikeAsync(connection, query, cancellationToken);
             }
 
             if (items.Count > 0)
@@ -597,6 +568,106 @@ public sealed partial class ClipboardRepository : IHistoryService, IDisposable
     /// Sanitises user input into an FTS5 MATCH expression.
     /// Strips special FTS5 characters, splits into tokens, and applies prefix matching (*) to each token.
     /// </summary>
+    private static async Task<List<ClipboardItem>> SearchWithFtsAsync(
+        SqliteConnection connection,
+        string ftsQuery,
+        CancellationToken cancellationToken)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT
+                id,
+                content_hash,
+                content_type,
+                title,
+                preview_text,
+                content_text,
+                source_app_name,
+                source_app_path,
+                byte_size,
+                is_pinned,
+                pin_order,
+                is_favorite,
+                created_at,
+                last_used_at,
+                use_count,
+                image_uri
+            FROM clipboard_items
+            WHERE id IN (
+                SELECT item_id FROM clipboard_items_fts
+                WHERE clipboard_items_fts MATCH @query
+            )
+            ORDER BY is_pinned DESC, pin_order, created_at DESC
+            """;
+        command.Parameters.AddWithValue("@query", ftsQuery);
+
+        return await ReadItemsAsync(command, cancellationToken);
+    }
+
+    private static async Task<List<ClipboardItem>> SearchWithLikeAsync(
+        SqliteConnection connection,
+        string query,
+        CancellationToken cancellationToken)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT
+                id,
+                content_hash,
+                content_type,
+                title,
+                preview_text,
+                content_text,
+                source_app_name,
+                source_app_path,
+                byte_size,
+                is_pinned,
+                pin_order,
+                is_favorite,
+                created_at,
+                last_used_at,
+                use_count,
+                image_uri
+            FROM clipboard_items
+            WHERE title LIKE @query ESCAPE '\'
+               OR preview_text LIKE @query ESCAPE '\'
+               OR content_text LIKE @query ESCAPE '\'
+               OR content_type LIKE @query ESCAPE '\'
+            ORDER BY is_pinned DESC, pin_order, created_at DESC
+            """;
+        command.Parameters.AddWithValue("@query", $"%{EscapeLikePattern(query.Trim())}%");
+
+        return await ReadItemsAsync(command, cancellationToken);
+    }
+
+    private static async Task<List<ClipboardItem>> ReadItemsAsync(
+        SqliteCommand command,
+        CancellationToken cancellationToken)
+    {
+        var items = new List<ClipboardItem>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            items.Add(MapRow(reader));
+        }
+
+        return items;
+    }
+
+    private static bool ShouldPreferLikeFallback(string raw)
+    {
+        var tokenChars = raw.Count(char.IsLetterOrDigit);
+        return tokenChars > 0 && tokenChars <= ShortSearchQueryLength;
+    }
+
+    private static string EscapeLikePattern(string raw)
+    {
+        return raw
+            .Replace(@"\", @"\\", StringComparison.Ordinal)
+            .Replace("%", @"\%", StringComparison.Ordinal)
+            .Replace("_", @"\_", StringComparison.Ordinal);
+    }
+
     private static string BuildFtsQuery(string raw)
     {
         // Remove FTS5 special characters except alphanumeric, whitespace, and underscore.
