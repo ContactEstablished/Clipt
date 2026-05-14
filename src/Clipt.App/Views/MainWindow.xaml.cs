@@ -105,6 +105,13 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (e.Key == Key.E && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            ToggleMode();
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key is Key.Delete or Key.Back)
         {
             // Do not delete while the user is editing text in the search box.

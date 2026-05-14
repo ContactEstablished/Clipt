@@ -315,7 +315,7 @@ The window has two distinct modes that match the two main use cases for a clipbo
 #### Behavior
 - [x] Window opens in last-used mode (persisted per user)
 - [x] **Tab** toggles between modes
-- [ ] **Ctrl+E** toggles between modes
+- [x] **Ctrl+E** toggles between modes
 - [x] Smooth animated resize when toggling — `Storyboard` animating `Width` over 180ms with cubic ease
 - [x] Window anchors to its current screen position during resize (don't jump to center)
 - [ ] **Auto-expand on item single-click** is an opt-in setting — when on, clicking an item in capture mode slides the window into work mode and selects that item
