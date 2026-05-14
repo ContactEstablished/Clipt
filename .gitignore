@@ -285,3 +285,5 @@ yarn-error.log*
 *.tmp
 *.temp
 *.old
+
+.claude/worktrees/pedantic-cartwright-dbaacb

@@ -4,9 +4,11 @@
 
 Polished, native Windows clipboard history with fast capture and rich review modes.
 
-## Phase 1 — Visual Foundation
+## Phase 1 — Native Capture Foundation
 
-Current status: the app builds into a dark Windows 11-style WPF shell with a borderless rounded window, teal accent theme, demo clipboard history, capture/work mode toggle, preview pane, sidebar placeholders, tray icon, and test/CI foundation. Clipboard monitoring, SQLite persistence, settings, and hotkeys are intentionally stubbed for later phases.
+Current status: the app builds into a dark Windows 11-style WPF shell with a borderless window, teal accent theme, capture/work mode toggle, persisted SQLite clipboard history, live FTS-backed search, content-type filters, pinning, rich previews, tray integration, configurable global hotkey, clipboard monitoring, source-app privacy filters, history retention, per-clip size guards, and demo content for screenshot work.
+
+The next near-term polish pass is README/screenshot readiness: capture the hero image, reconcile the feature checklist as V1 closes, then tighten the remaining user-facing settings that are still marked as coming later.
 
 ## Screenshots
 
@@ -34,8 +36,8 @@ dotnet test Clipt.sln --configuration Release --no-build
 - Microsoft.Extensions.Hosting and DependencyInjection
 - Microsoft.Extensions.Logging with Serilog file/debug sinks
 - H.NotifyIcon.Wpf
-- NHotkey.Wpf stubbed for Phase 2
-- Microsoft.Data.Sqlite stubbed for Phase 2
+- NHotkey.Wpf global hotkeys
+- Microsoft.Data.Sqlite with FTS5-backed history
 - Markdig and Markdig.Wpf
 - AvalonEdit
 - xUnit and FluentAssertions

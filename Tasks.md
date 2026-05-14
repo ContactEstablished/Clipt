@@ -265,38 +265,45 @@ Clipt/
 
 ## Core Features (V1)
 
+Current implementation snapshot: the app now has a working WPF shell, SQLite persistence, clipboard monitoring for text/image/file content, source app metadata, configurable global hotkey, tray menu, capture/work modes, markdown/code/image/file/color previews, content-type filters, pinning, privacy ignore lists, retention pruning, per-clip size guardrails, Serilog logging, CI, and unit coverage for core/data behavior. The remaining unchecked items below are either incomplete, intentionally deferred, or still need manual visual QA.
+
 ### Clipboard Monitoring
-- [ ] Win32 clipboard listener via `AddClipboardFormatListener` + `WM_CLIPBOARDUPDATE`
-- [ ] Capture all available formats per copy event (not just text)
+- [x] Win32 clipboard listener via `AddClipboardFormatListener` + `WM_CLIPBOARDUPDATE`
+- [x] Capture supported text, image, and file-drop formats per copy event
+- [ ] Capture arbitrary/custom clipboard formats beyond the currently supported text/image/file set
 - [ ] Detect and skip clipboard content with `CF_CLIPBOARD_VIEWER_IGNORE` flag (password managers)
-- [ ] Identify source application via `GetForegroundWindow` + process info
-- [ ] Hash-based duplicate detection (move existing entry to top instead of duplicating)
-- [ ] Configurable max history size with auto-pruning of oldest unpinned items
-- [ ] Configurable per-format size limits (e.g., skip images > 50MB)
+- [x] Identify source application via `GetForegroundWindow` + process info
+- [x] Hash-based duplicate detection updates existing entries instead of inserting duplicates
+- [ ] Move existing duplicate entries to the top of history when recaptured
+- [x] Configurable max history size with auto-pruning of oldest unpinned items
+- [x] Configurable per-clip size limit covering captured payloads
 
 ### Content Type Detection
-- [ ] Plain text (default fallback)
-- [ ] Markdown (heuristic: presence of `#`, `**`, `[](`, fenced code blocks, etc.)
-- [ ] Code (heuristic + extension detection if from a file path)
-- [ ] URL (regex match on full content)
-- [ ] Color (hex `#RGB` / `#RRGGBB`, `rgb()`, `hsl()`)
-- [ ] JSON (attempt parse)
-- [ ] Image (from format)
-- [ ] Files (from `CF_HDROP`)
+- [x] Plain text (default fallback)
+- [x] Markdown (basic heuristic for headings and fenced code blocks)
+- [x] Code (basic heuristic for C#/SQL-like content)
+- [x] URL (absolute HTTP/HTTPS content)
+- [x] Color (hex `#RGB` / `#RRGGBB`)
+- [ ] Color `rgb()` / `hsl()` detection
+- [x] JSON (attempt parse)
+- [x] Image (from format)
+- [x] Files (from `CF_HDROP`)
 
 ### Main Window UI
-- [ ] Borderless, rounded-corner window
-- [ ] Two-pane layout: left = item list, right = preview pane
-- [ ] Search box at top with live fuzzy filtering (FTS5 backed)
-- [ ] List items show: icon (by content type), preview text, source app, timestamp, pin indicator
-- [ ] Keyboard navigation (arrow keys, Enter to paste, Esc to close)
-- [ ] Mouse + keyboard friendly
+- [x] Borderless window with Win11 rounded-corner preference
+- [x] Two-pane layout: left = item list, right = preview pane
+- [x] Search box at top with live FTS5-backed prefix search
+- [ ] Fuzzy search behavior beyond FTS5 prefix matching
+- [x] List items show: icon (by content type), preview text, source app, timestamp, pin indicator
+- [x] Keyboard shortcuts for paste, close, delete, and pin
+- [x] Mouse + keyboard friendly
 - [ ] Always-on-top toggle
-- [ ] **Transparency slider** (10% to 100%) bound to `Window.Opacity`, persists in settings
+- [x] **Transparency slider** (10% to 100%) bound to `Window.Opacity`, persists in settings
 - [x] Prominent paused-capture visual cue in the main window (e.g., flag/banner/status pill) so users can immediately tell clipboard capture is paused
-- [ ] Drag-to-move on title area
-- [ ] Remembers last position and size
-- [ ] Drop shadow / acrylic backdrop on Windows 11 (via `DwmSetWindowAttribute`)
+- [x] Drag-to-move on title area
+- [x] Remembers last position and size
+- [x] Mica backdrop / rounded window preference on Windows 11 (via `DwmSetWindowAttribute`)
+- [ ] Final screenshot QA for shadow/backdrop polish
 
 ### Dual-Mode View (Capture vs. Work)
 
@@ -306,44 +313,50 @@ The window has two distinct modes that match the two main use cases for a clipbo
 - **Work mode (expanded, two-pane ~880px wide)** — for organizing, reviewing, or curating clips. List on the left, full preview pane on the right with markdown rendering, format toggles, and metadata.
 
 #### Behavior
-- [ ] Window opens in last-used mode (persisted per user)
-- [ ] **Tab** or **Ctrl+E** toggles between modes
-- [ ] Smooth animated resize when toggling — `Storyboard` animating `Width` over 180ms with cubic ease
-- [ ] Window anchors to its current screen position during resize (don't jump to center)
+- [x] Window opens in last-used mode (persisted per user)
+- [x] **Tab** toggles between modes
+- [ ] **Ctrl+E** toggles between modes
+- [x] Smooth animated resize when toggling — `Storyboard` animating `Width` over 180ms with cubic ease
+- [x] Window anchors to its current screen position during resize (don't jump to center)
 - [ ] **Auto-expand on item single-click** is an opt-in setting — when on, clicking an item in capture mode slides the window into work mode and selects that item
-- [ ] Each mode remembers its own preferred size — user can resize work mode wider without affecting capture mode
-- [ ] Capture mode: items are 32px tall, 12px font, single-line title with relative time on the right
-- [ ] Work mode: items are 56px tall with two-line layout (title + preview text + source app metadata)
-- [ ] Mode indicator in the title bar (small icon button) so users discover the toggle even without knowing the hotkey
+- [x] Each mode remembers its own preferred width — user can resize work mode wider without affecting capture mode
+- [x] Capture mode: compact single-line title with relative time on the right
+- [x] Work mode: richer two-line layout with preview text and source app metadata
+- [x] Mode indicator in the title bar (small icon button) so users discover the toggle even without knowing the hotkey
 - [ ] Settings → Appearance: default mode dropdown, default sizes for each mode, toggle for auto-expand-on-click
 
 ### Preview Pane
-- [ ] Text: monospace for code, proportional for prose
-- [ ] **Markdown: native WPF FlowDocument via Markdig.Wpf with toggle between rendered and raw views** (lightweight, theme-aware, no browser runtime)
-- [ ] Code: syntax highlighting via `ColorCode.Wpf` or `AvalonEdit` (both render to native WPF — no WebView2 needed)
-- [ ] Image: scaled preview with dimensions and size
+- [x] Text: monospace for code, proportional for prose
+- [x] Markdown: native WPF rendering via Markdig.Wpf
+- [ ] Markdown raw/rendered toggle
+- [x] Code: syntax highlighting via AvalonEdit
+- [x] Image: scaled preview with dimensions and size
 - [ ] URL: show URL + attempt to fetch og:image and og:title (cached, optional, disabled by default for privacy)
-- [ ] Files: list with icons and paths
-- [ ] Color: visual swatch + hex/rgb/hsl conversions
-- [ ] JSON: pretty-printed with collapsible nodes (use AvalonEdit with JSON folding)
+- [x] Files: list with icons and paths
+- [x] Color: visual swatch for hex colors
+- [ ] Color hex/rgb/hsl conversions
+- [x] JSON: syntax-highlighted preview via AvalonEdit
+- [ ] JSON collapsible nodes / folding
 
 ### Search
-- [ ] FTS5 full-text search over preview_text
+- [x] FTS5 full-text search over preview_text
 - [ ] Fuzzy matching (FTS5 doesn't do fuzzy natively — use trigram extension or fallback to LIKE for short queries)
-- [ ] Filter chips: All, Text, Markdown, Code, URLs, Images, Files, Pinned
+- [x] Filter chips: All, Text, Markdown, Code, JSON, URLs, Images, Files, Color
+- [ ] Pinned filter chip
 - [ ] Search history within the search box
 
 ### Pinning & Organization
-- [ ] Pin/unpin via keyboard shortcut, context menu, or pin icon
-- [ ] Pinned items always appear at top of list
+- [x] Pin/unpin via keyboard shortcut or pin icon
+- [ ] Pin/unpin context menu
+- [x] Pinned items always appear at top of list
 - [ ] Drag-to-reorder pins
 - [ ] Tags with custom colors
 - [ ] Tag filtering in search
 
 ### System Tray
-- [ ] Tray icon with state indicators (idle, capturing, paused)
-- [ ] Left-click: open main window
-- [ ] Right-click context menu:
+- [x] Tray icon with capturing/paused tooltip and pause menu state
+- [x] Left-click: open main window
+- [x] Right-click context menu:
   - Open Clipt
   - Pause/Resume capturing
   - Clear history (with confirmation)
@@ -353,36 +366,37 @@ The window has two distinct modes that match the two main use cases for a clipbo
 - [ ] Notification on first launch explaining the app is running
 
 ### Global Hotkey
-- [ ] Default: `Ctrl+Shift+V` (Win+V is reserved by Windows)
-- [ ] Configurable in settings
-- [ ] Conflict detection on registration
+- [x] Default: `Ctrl+Shift+V` (Win+V is reserved by Windows)
+- [x] Configurable in settings
+- [x] Best-effort conflict handling on registration
 
 ### Settings Window
-- [ ] General tab:
-  - Start with Windows (registry HKCU\Software\Microsoft\Windows\CurrentVersion\Run)
-  - Theme: System / Light / Dark
-  - Language
-  - **Auto-paste on Enter** (checkbox; default enabled) — when off, Enter only copies to clipboard
-  - **Restore previous clipboard after paste** (checkbox; default off)
-- [ ] Hotkeys tab:
-  - Open main window (with **"Set your own hotkey"** capture control — listens for any key combination, validates conflicts, allows custom binding)
-  - Toggle pause/resume
-  - Quick paste 1-9 (Ctrl+Shift+1 through 9 for top items)
-  - Reset to defaults button
-- [ ] History tab:
-  - Max items to keep
-  - Auto-prune after N days
-  - Skip clipboard data larger than N MB
-- [ ] Privacy tab:
-  - Ignored applications list (with picker)
-  - Ignored regex patterns
-  - Honor password manager flag (default on)
-  - Pause when specified apps are focused
-- [ ] Appearance tab:
-  - Default opacity
-  - Window size and position behavior
-  - Show source app name
-  - Compact / comfortable list density
+- [x] General tab:
+  - [x] **Auto-paste on Enter** (checkbox; default enabled) — when off, Enter only copies to clipboard
+  - [ ] Start with Windows (registry HKCU\Software\Microsoft\Windows\CurrentVersion\Run)
+  - [ ] Theme: System / Light / Dark
+  - [ ] Language
+  - [ ] **Restore previous clipboard after paste** (checkbox; default off)
+- [x] Hotkeys tab:
+  - [x] Open main window (with **"Set your own hotkey"** capture control — listens for modifiers plus one key)
+  - [x] Reset to defaults button
+  - [ ] Toggle pause/resume hotkey
+  - [ ] Quick paste 1-9 (Ctrl+Shift+1 through 9 for top items)
+- [x] History tab:
+  - [x] Max items to keep
+  - [x] Auto-prune after N days
+  - [x] Skip clipboard data larger than N MB
+- [x] Privacy tab:
+  - [x] Ignored applications list with executable path picker
+  - [x] Ignored regex/pattern list
+  - [ ] Honor password manager flag (default on)
+  - [ ] Pause when specified apps are focused
+- [x] Appearance tab:
+  - [x] Default opacity via main-window transparency slider
+  - [x] Window size and position behavior
+  - [x] Load demo content action for screenshot/showroom setup
+  - [ ] Theme controls
+  - [ ] Compact / comfortable list density setting
 - [ ] Backup & Transfer tab (V2 — see Phase 2 section):
   - Export history button (opens Export wizard)
   - Import history button (opens Import wizard)
@@ -392,23 +406,23 @@ The window has two distinct modes that match the two main use cases for a clipbo
   - Version, license, GitHub link, check for updates button
 
 ### Pasting
-- [ ] **Auto-paste toggle in settings** — when enabled (default), pressing Enter copies to clipboard AND simulates Ctrl+V into the previous foreground window via `SendInput`. When disabled, Enter only copies to clipboard and the user pastes manually with Ctrl+V.
-- [ ] Track previous foreground window via `GetForegroundWindow` before main window opens, so we know where to send the paste
-- [ ] Single Enter on a list item: behavior depends on auto-paste toggle (above)
-- [ ] Shift-Enter: paste as plain text (strip formatting)
+- [x] **Auto-paste toggle in settings** — when enabled (default), pressing Enter copies to clipboard AND simulates Ctrl+V into the previous foreground window via `SendInput`. When disabled, Enter only copies to clipboard and the user pastes manually with Ctrl+V.
+- [x] Track previous foreground window via `GetForegroundWindow` before main window opens, so we know where to send the paste
+- [x] Single Enter on a list item: behavior depends on auto-paste toggle (above)
+- [x] Shift-Enter: paste as plain text (strip formatting)
 - [ ] Ctrl-Enter: paste as markdown source (raw, even if rendered preview is shown)
 - [ ] Restore previous clipboard contents after paste (optional, configurable — defaults to off because it surprises some users)
 - [ ] Quick paste hotkeys (Ctrl+Shift+1 through 9): paste the Nth most recent item directly without opening the window
 
 ### Privacy & Security
-- [ ] All data stored locally in `%LOCALAPPDATA%\Clipt\clipt.db`
+- [x] All data stored locally in `%LOCALAPPDATA%\Clipt\clipt.db`
 - [ ] Database optionally encrypted via SQLCipher (stretch goal — adds complexity)
 - [ ] Auto-clear sensitive content (numbers matching credit card / SSN regex)
 - [ ] Pause-on-focus for specified apps (banking sites, password managers)
-- [ ] No telemetry, no network calls except optional update check + opt-in URL preview fetch
+- [x] No telemetry or network calls in current app behavior
 
 ### Logging & Diagnostics
-- [ ] Serilog rolling file logs in `%LOCALAPPDATA%\Clipt\logs\`
+- [x] Serilog rolling file logs in `%LOCALAPPDATA%\Clipt\logs\`
 - [ ] Log levels configurable (default: Warning in release, Debug in development)
 - [ ] "Open log folder" menu item in tray
 - [ ] Crash reporter writes minidump to logs folder
@@ -423,18 +437,18 @@ The window has two distinct modes that match the two main use cases for a clipbo
 
 ## Setup Tasks
 
-- [ ] `dotnet new sln -n Clipt`
-- [ ] Create projects per structure above
-- [ ] `Directory.Build.props` with `<LangVersion>preview</LangVersion>`, nullable reference types enabled, treat warnings as errors
-- [ ] `Directory.Packages.props` for central package management
-- [ ] `.gitignore` for .NET, VS, Rider, build outputs
-- [ ] Initial WPF window with placeholder content
-- [ ] Wire up `Microsoft.Extensions.Hosting` in `App.xaml.cs` for DI + lifetime
-- [ ] Set up Serilog with file + debug sinks
-- [ ] Initial SQLite migration with empty schema
-- [ ] Add xUnit test projects with sample passing tests
-- [ ] GitHub Actions CI workflow (build + test on push/PR)
-- [ ] Initial README with project description, screenshots placeholder, build instructions
+- [x] `dotnet new sln -n Clipt`
+- [x] Create projects per structure above
+- [x] `Directory.Build.props` with `<LangVersion>preview</LangVersion>`, nullable reference types enabled, treat warnings as errors
+- [x] `Directory.Packages.props` for central package management
+- [x] `.gitignore` for .NET, VS, Rider, build outputs
+- [x] Initial WPF window with placeholder content
+- [x] Wire up `Microsoft.Extensions.Hosting` in `App.xaml.cs` for DI + lifetime
+- [x] Set up Serilog with file + debug sinks
+- [x] Initial SQLite migration with empty schema
+- [x] Add xUnit test projects with sample passing tests
+- [x] GitHub Actions CI workflow (build + test on push/PR)
+- [x] Initial README with project description, screenshots placeholder, build instructions
 
 ## Phase 2 — Encrypted Export & Import
 
