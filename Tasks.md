@@ -297,7 +297,7 @@ Current implementation snapshot: the app now has a working WPF shell, SQLite per
 - [x] List items show: icon (by content type), preview text, source app, timestamp, pin indicator
 - [x] Keyboard shortcuts for paste, close, delete, and pin
 - [x] Mouse + keyboard friendly
-- [ ] Always-on-top toggle
+- [x] Always-on-top toggle
 - [x] **Transparency slider** (10% to 100%) bound to `Window.Opacity`, persists in settings
 - [x] Prominent paused-capture visual cue in the main window (e.g., flag/banner/status pill) so users can immediately tell clipboard capture is paused
 - [x] Drag-to-move on title area

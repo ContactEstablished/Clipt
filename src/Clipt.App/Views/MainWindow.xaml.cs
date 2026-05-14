@@ -168,6 +168,13 @@ public partial class MainWindow : Window
         ToggleMode();
     }
 
+    private async void OnAlwaysOnTopClick(object sender, RoutedEventArgs e)
+    {
+        Topmost = !Topmost;
+        _pendingSave = _pendingSave with { AlwaysOnTop = Topmost };
+        await SaveCurrentSettingsAsync();
+    }
+
     private void OnMinimizeClick(object sender, RoutedEventArgs e)
     {
         WindowState = WindowState.Minimized;

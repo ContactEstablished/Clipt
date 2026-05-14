@@ -274,6 +274,32 @@
                                       Stroke="{DynamicResource Clipt.Brush.Accent}"
                                       StrokeThickness="2" />
                             </Button>
+                            <Button Click="OnAlwaysOnTopClick"
+                                    Style="{StaticResource IconButtonStyle}"
+                                    ToolTip="Always on top">
+                                <Button.Resources>
+                                    <Style x:Key="AlwaysOnTopIconStyle" TargetType="Path">
+                                        <Setter Property="Stroke" Value="{DynamicResource Clipt.Brush.TextSecondary}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=Topmost}" Value="True">
+                                                <Setter Property="Stroke" Value="{DynamicResource Clipt.Brush.Accent}" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=IsMouseOver}" Value="True">
+                                                <Setter Property="Stroke" Value="{DynamicResource Clipt.Brush.Accent}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Resources>
+                                <Path Width="15"
+                                      Height="15"
+                                      Data="M8 2h8 M10 2v5l-4 5h12l-4-5V2 M12 12v6"
+                                      Stretch="Uniform"
+                                      StrokeLineJoin="Round"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeThickness="1.9"
+                                      Style="{StaticResource AlwaysOnTopIconStyle}" />
+                            </Button>
                             <Button Click="OnMinimizeClick"
                                     Style="{StaticResource IconButtonStyle}"
                                     ToolTip="Minimize">
