@@ -81,10 +81,9 @@
                                   IsChecked="{Binding AutoPasteOnEnter}" />
                         <CheckBox Margin="0,10,0,0"
                                   Content="Restore previous clipboard after paste"
-                                  Foreground="{DynamicResource Clipt.Brush.TextMuted}"
+                                  Foreground="{DynamicResource Clipt.Brush.Text}"
                                   IsChecked="{Binding RestorePreviousClipboardAfterPaste}"
-                                  IsEnabled="False"
-                                  ToolTip="Coming later." />
+                                  ToolTip="After auto-paste, put the clipboard back the way it was before Clipt wrote the selected item." />
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

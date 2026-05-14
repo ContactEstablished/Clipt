@@ -90,6 +90,7 @@ public partial class App : Application
         builder.Services.AddSingleton<ISourceAppResolver, WindowsSourceAppResolver>();
         builder.Services.AddSingleton<ForegroundWindowTracker>();
         builder.Services.AddSingleton<IClipboardWriter, WpfClipboardWriter>();
+        builder.Services.AddSingleton<ClipboardSnapshotService>();
         builder.Services.AddSingleton<IInputSimulator, SendInputPasteService>();
         builder.Services.AddSingleton<IHotkeyService, GlobalHotkeyService>();
         builder.Services.AddHostedService<AppLifecycleService>();

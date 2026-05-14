@@ -27,6 +27,7 @@ public partial class MainWindow : Window
     private readonly IHotkeyService _hotkeyService;
     private readonly ForegroundWindowTracker _foregroundTracker;
     private readonly IClipboardWriter _clipboardWriter;
+    private readonly ClipboardSnapshotService _clipboardSnapshotService;
     private readonly IInputSimulator _inputSimulator;
     private readonly DemoContentSeeder _demoContentSeeder;
     private bool _isQuitting;
@@ -44,6 +45,7 @@ public partial class MainWindow : Window
         IHotkeyService hotkeyService,
         ForegroundWindowTracker foregroundTracker,
         IClipboardWriter clipboardWriter,
+        ClipboardSnapshotService clipboardSnapshotService,
         IInputSimulator inputSimulator,
         DemoContentSeeder demoContentSeeder,
         ILogger<MainWindow> logger)
@@ -54,6 +56,7 @@ public partial class MainWindow : Window
         _hotkeyService = hotkeyService;
         _foregroundTracker = foregroundTracker;
         _clipboardWriter = clipboardWriter;
+        _clipboardSnapshotService = clipboardSnapshotService;
         _inputSimulator = inputSimulator;
         _demoContentSeeder = demoContentSeeder;
         _logger = logger;
@@ -427,19 +430,27 @@ public partial class MainWindow : Window
                 ? ClipboardWriteOptions.PlainText
                 : ClipboardWriteOptions.Default;
 
+            var autoPaste = _pendingSave.AutoPasteOnEnter;
+            var targetHwnd = _foregroundTracker.PreviousForegroundWindow;
+            var myHwnd = new WindowInteropHelper(this).Handle;
+            var canAutoPasteToExternalWindow = autoPaste && targetHwnd != 0 && targetHwnd != myHwnd;
+            var restorePreviousClipboard = _pendingSave.RestorePreviousClipboardAfterPaste
+                && canAutoPasteToExternalWindow;
+            var previousClipboard = restorePreviousClipboard
+                ? await _clipboardSnapshotService.CaptureAsync(CancellationToken.None)
+                : null;
+
             await _clipboardWriter.WriteAsync(selected.Model, options, CancellationToken.None);
 
             // Auto-paste via SendInput (best-effort; failure is non-fatal because
             // the item is already on the clipboard for manual paste).
-            var autoPaste = _pendingSave.AutoPasteOnEnter;
-            var targetHwnd = _foregroundTracker.PreviousForegroundWindow;
+            var pasteSent = false;
 
             if (autoPaste && targetHwnd != 0)
             {
-                var myHwnd = new WindowInteropHelper(this).Handle;
                 if (targetHwnd != myHwnd)
                 {
-                    await _inputSimulator.SendPasteAsync(targetHwnd, CancellationToken.None);
+                    pasteSent = await _inputSimulator.SendPasteAsync(targetHwnd, CancellationToken.None);
                 }
                 else
                 {
@@ -450,6 +461,12 @@ public partial class MainWindow : Window
             {
                 _logger.LogDebug(
                     "No previous foreground window captured; item is on clipboard, user can paste manually.");
+            }
+
+            if (pasteSent && restorePreviousClipboard && previousClipboard is not null)
+            {
+                await Task.Delay(150);
+                await _clipboardSnapshotService.RestoreAsync(previousClipboard, CancellationToken.None);
             }
 
             await SaveAndHideAsync();

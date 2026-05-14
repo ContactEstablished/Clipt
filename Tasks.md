@@ -376,7 +376,7 @@ The window has two distinct modes that match the two main use cases for a clipbo
   - [ ] Start with Windows (registry HKCU\Software\Microsoft\Windows\CurrentVersion\Run)
   - [ ] Theme: System / Light / Dark
   - [ ] Language
-  - [ ] **Restore previous clipboard after paste** (checkbox; default off)
+  - [x] **Restore previous clipboard after paste** (checkbox; default off)
 - [x] Hotkeys tab:
   - [x] Open main window (with **"Set your own hotkey"** capture control — listens for modifiers plus one key)
   - [x] Reset to defaults button
@@ -411,7 +411,7 @@ The window has two distinct modes that match the two main use cases for a clipbo
 - [x] Single Enter on a list item: behavior depends on auto-paste toggle (above)
 - [x] Shift-Enter: paste as plain text (strip formatting)
 - [ ] Ctrl-Enter: paste as markdown source (raw, even if rendered preview is shown)
-- [ ] Restore previous clipboard contents after paste (optional, configurable — defaults to off because it surprises some users)
+- [x] Restore previous clipboard contents after paste (optional, configurable — defaults to off because it surprises some users)
 - [ ] Quick paste hotkeys (Ctrl+Shift+1 through 9): paste the Nth most recent item directly without opening the window
 
 ### Privacy & Security

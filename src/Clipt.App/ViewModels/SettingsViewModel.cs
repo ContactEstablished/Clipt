@@ -45,7 +45,6 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     public partial bool AutoPasteOnEnter { get; set; }
 
-    /// <summary>Displayed disabled — restore-after-paste is not implemented yet.</summary>
     [ObservableProperty]
     public partial bool RestorePreviousClipboardAfterPaste { get; set; }
 
@@ -152,7 +151,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         var updated = _baseline with
         {
             AutoPasteOnEnter = AutoPasteOnEnter,
-            RestorePreviousClipboardAfterPaste = _baseline.RestorePreviousClipboardAfterPaste,
+            RestorePreviousClipboardAfterPaste = RestorePreviousClipboardAfterPaste,
             MaxHistoryItems = maxHistory,
             AutoPruneAfterDays = autoPruneAfterDays,
             MaxClipboardItemBytes = maxClipBytes,
