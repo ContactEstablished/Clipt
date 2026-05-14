@@ -271,7 +271,7 @@ Current implementation snapshot: the app now has a working WPF shell, SQLite per
 - [x] Win32 clipboard listener via `AddClipboardFormatListener` + `WM_CLIPBOARDUPDATE`
 - [x] Capture supported text, image, and file-drop formats per copy event
 - [ ] Capture arbitrary/custom clipboard formats beyond the currently supported text/image/file set
-- [ ] Detect and skip clipboard content with `CF_CLIPBOARD_VIEWER_IGNORE` flag (password managers)
+- [x] Detect and skip clipboard content with `CF_CLIPBOARD_VIEWER_IGNORE` flag (password managers)
 - [x] Identify source application via `GetForegroundWindow` + process info
 - [x] Hash-based duplicate detection updates existing entries instead of inserting duplicates
 - [ ] Move existing duplicate entries to the top of history when recaptured
@@ -389,7 +389,7 @@ The window has two distinct modes that match the two main use cases for a clipbo
 - [x] Privacy tab:
   - [x] Ignored applications list with executable path picker
   - [x] Ignored regex/pattern list
-  - [ ] Honor password manager flag (default on)
+  - [x] Honor password manager flag (default on)
   - [ ] Pause when specified apps are focused
 - [x] Appearance tab:
   - [x] Default opacity via main-window transparency slider

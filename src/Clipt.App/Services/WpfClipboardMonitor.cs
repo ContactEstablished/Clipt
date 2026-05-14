@@ -210,6 +210,12 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
 
         try
         {
+            if (ShouldSkipClipboardViewerIgnore())
+            {
+                _logger.LogDebug("Clipboard update ignored: Clipboard Viewer Ignore format is present.");
+                return;
+            }
+
             if (TryCaptureFileDropClipboardItem())
             {
                 return;
@@ -275,6 +281,16 @@ public sealed class WpfClipboardMonitor : IClipboardMonitor, IDisposable
         {
             _logger.LogDebug(exception, "Clipboard text capture failed.");
         }
+    }
+
+    private bool ShouldSkipClipboardViewerIgnore()
+    {
+        if (_cachedSettings?.HonorClipboardViewerIgnore != true)
+        {
+            return false;
+        }
+
+        return Clipboard.ContainsData(ClipboardNative.ClipboardViewerIgnoreFormat);
     }
 
     private bool TryCaptureFileDropClipboardItem()

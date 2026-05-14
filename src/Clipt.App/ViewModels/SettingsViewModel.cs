@@ -66,7 +66,6 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     public partial string IgnoredPatternsText { get; set; } = string.Empty;
 
-    /// <summary>Displayed disabled — CF viewer ignore is not wired yet.</summary>
     [ObservableProperty]
     public partial bool HonorClipboardViewerIgnore { get; set; }
 
@@ -158,7 +157,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             IgnoredAppNames = PrivacyEntryNormalizer.Normalize(SplitLines(IgnoredAppNamesText)),
             IgnoredAppPaths = PrivacyEntryNormalizer.Normalize(SplitLines(IgnoredAppPathsText)),
             IgnoredPatterns = PrivacyEntryNormalizer.Normalize(SplitLines(IgnoredPatternsText)),
-            HonorClipboardViewerIgnore = _baseline.HonorClipboardViewerIgnore,
+            HonorClipboardViewerIgnore = HonorClipboardViewerIgnore,
             OpenHotkey = hotkey,
         };
 

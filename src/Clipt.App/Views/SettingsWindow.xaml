@@ -238,10 +238,9 @@
                                  Text="{Binding IgnoredPatternsText, UpdateSourceTrigger=PropertyChanged}" />
                         <CheckBox Margin="0,14,0,0"
                                   Content="Honor Clipboard Viewer ignore flag"
-                                  Foreground="{DynamicResource Clipt.Brush.TextMuted}"
+                                  Foreground="{DynamicResource Clipt.Brush.Text}"
                                   IsChecked="{Binding HonorClipboardViewerIgnore}"
-                                  IsEnabled="False"
-                                  ToolTip="Coming later — not implemented yet." />
+                                  ToolTip="Skip captures from apps that mark clipboard contents as hidden from clipboard managers." />
                         <TextBlock Margin="0,16,0,0"
                                    Foreground="{DynamicResource Clipt.Brush.TextMuted}"
                                    FontSize="12"
