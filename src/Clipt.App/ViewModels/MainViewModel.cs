@@ -84,6 +84,9 @@ public sealed partial class MainViewModel : ObservableObject
     public partial ContentType? ActiveContentTypeFilter { get; set; }
 
     [ObservableProperty]
+    public partial bool IsPinnedFilterActive { get; set; }
+
+    [ObservableProperty]
     public partial bool IsWorkMode { get; set; }
 
     [ObservableProperty]
@@ -241,8 +244,8 @@ public sealed partial class MainViewModel : ObservableObject
 
             var baseItems = _searchService.Filter(_demoItems, SearchText);
             UpdateContentTypeFilterCounts(baseItems);
-            PopulateItems(ApplyContentTypeFilter(baseItems));
-            SelectedItem = Items.FirstOrDefault(i => i.Id == item.Id);
+            PopulateItems(ApplyActiveFilter(baseItems));
+            SelectedItem = Items.FirstOrDefault(i => i.Id == item.Id) ?? Items.FirstOrDefault();
             return;
         }
 
@@ -251,7 +254,7 @@ public sealed partial class MainViewModel : ObservableObject
             var newPinnedState = !item.IsPinned;
             await _historyService.SetPinnedAsync(item.Id, newPinnedState, CancellationToken.None);
             await RefreshItemsAsync();
-            SelectedItem = Items.FirstOrDefault(i => i.Id == item.Id);
+            SelectedItem = Items.FirstOrDefault(i => i.Id == item.Id) ?? Items.FirstOrDefault();
         }
         catch (Exception exception)
         {
@@ -294,7 +297,7 @@ public sealed partial class MainViewModel : ObservableObject
         {
             var baseItems = _searchService.Filter(_demoItems, query);
             UpdateContentTypeFilterCounts(baseItems);
-            PopulateItems(ApplyContentTypeFilter(baseItems));
+            PopulateItems(ApplyActiveFilter(baseItems));
             return;
         }
 
@@ -302,7 +305,7 @@ public sealed partial class MainViewModel : ObservableObject
         {
             var baseItems = await _historyService.SearchAsync(query, token);
             UpdateContentTypeFilterCounts(baseItems);
-            PopulateItems(ApplyContentTypeFilter(baseItems));
+            PopulateItems(ApplyActiveFilter(baseItems));
         }
         catch (OperationCanceledException)
         {
@@ -333,7 +336,7 @@ public sealed partial class MainViewModel : ObservableObject
         {
             var baseItems = _searchService.Filter(_demoItems, SearchText);
             UpdateContentTypeFilterCounts(baseItems);
-            PopulateItems(ApplyContentTypeFilter(baseItems));
+            PopulateItems(ApplyActiveFilter(baseItems));
             return;
         }
 
@@ -341,7 +344,7 @@ public sealed partial class MainViewModel : ObservableObject
         {
             var baseItems = await _historyService.SearchAsync(SearchText, CancellationToken.None);
             UpdateContentTypeFilterCounts(baseItems);
-            PopulateItems(ApplyContentTypeFilter(baseItems));
+            PopulateItems(ApplyActiveFilter(baseItems));
         }
         catch (Exception exception)
         {
@@ -354,7 +357,9 @@ public sealed partial class MainViewModel : ObservableObject
         foreach (var filter in ContentTypeFilters)
         {
             filter.Count = filter.ContentType is null
-                ? baseItems.Count
+                ? filter.IsPinnedFilter
+                    ? baseItems.Count(i => i.IsPinned)
+                    : baseItems.Count
                 : baseItems.Count(i => i.ContentType == filter.ContentType.Value);
         }
     }
@@ -373,6 +378,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         ActiveContentTypeFilter = filter.ContentType;
+        IsPinnedFilterActive = filter.IsPinnedFilter;
         await RefreshItemsAsync();
     }
 
@@ -389,11 +395,17 @@ public sealed partial class MainViewModel : ObservableObject
             new ContentTypeFilterViewModel("Files", ContentType.File),
             new ContentTypeFilterViewModel("Images", ContentType.Image),
             new ContentTypeFilterViewModel("Color", ContentType.Color),
+            new ContentTypeFilterViewModel("Pinned", null, isPinnedFilter: true),
         ];
     }
 
-    private IReadOnlyList<ClipboardItem> ApplyContentTypeFilter(IReadOnlyList<ClipboardItem> items)
+    private IReadOnlyList<ClipboardItem> ApplyActiveFilter(IReadOnlyList<ClipboardItem> items)
     {
+        if (IsPinnedFilterActive)
+        {
+            return items.Where(i => i.IsPinned).ToList();
+        }
+
         if (ActiveContentTypeFilter is null)
         {
             return items;
@@ -484,6 +496,11 @@ public sealed partial class MainViewModel : ObservableObject
 
     private bool MatchesActiveContentTypeFilter(ClipboardItem item)
     {
+        if (IsPinnedFilterActive)
+        {
+            return item.IsPinned;
+        }
+
         return ActiveContentTypeFilter is null || item.ContentType == ActiveContentTypeFilter.Value;
     }
 
