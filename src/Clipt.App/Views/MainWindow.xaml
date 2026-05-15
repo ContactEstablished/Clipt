@@ -337,11 +337,46 @@
                                     <RowDefinition Height="*" />
                                 </Grid.RowDefinitions>
 
-                                <TextBox x:Name="SearchBox"
-                                         Grid.Row="0"
-                                         Margin="0,0,0,8"
-                                         Style="{StaticResource SearchBoxStyle}"
-                                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
+                                <Grid Grid.Row="0"
+                                      Margin="0,0,0,8">
+                                    <TextBox x:Name="SearchBox"
+                                             Padding="34,0,40,0"
+                                             Style="{StaticResource SearchBoxStyle}"
+                                             Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
+                                    <Button Width="28"
+                                            Height="28"
+                                            Margin="0,0,4,0"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center"
+                                            Background="Transparent"
+                                            BorderBrush="Transparent"
+                                            Padding="0"
+                                            ToolTip="Recent searches"
+                                            Click="OnSearchHistoryClick">
+                                        <Button.ContextMenu>
+                                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                                         ItemsSource="{Binding SearchHistory}"
+                                                         MinWidth="{Binding PlacementTarget.ActualWidth, RelativeSource={RelativeSource Self}}">
+                                                <ContextMenu.ItemContainerStyle>
+                                                    <Style TargetType="{x:Type MenuItem}">
+                                                        <Setter Property="Header" Value="{Binding}" />
+                                                        <Setter Property="Command" Value="{Binding DataContext.SelectSearchHistoryCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                        <Setter Property="CommandParameter" Value="{Binding}" />
+                                                    </Style>
+                                                </ContextMenu.ItemContainerStyle>
+                                            </ContextMenu>
+                                        </Button.ContextMenu>
+                                        <Path Width="12"
+                                              Height="12"
+                                              Data="M6 2v4h4 M10 6a4 4 0 1 0 1.1 2.75"
+                                              Stretch="Uniform"
+                                              Stroke="{DynamicResource Clipt.Brush.TextMuted}"
+                                              StrokeLineJoin="Round"
+                                              StrokeStartLineCap="Round"
+                                              StrokeEndLineCap="Round"
+                                              StrokeThickness="1.8" />
+                                    </Button>
+                                </Grid>
 
                                 <ItemsControl Grid.Row="1"
                                               Margin="0,0,0,8"

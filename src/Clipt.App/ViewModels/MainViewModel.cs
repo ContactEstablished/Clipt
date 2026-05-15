@@ -15,6 +15,7 @@ namespace Clipt.App.ViewModels;
 public sealed partial class MainViewModel : ObservableObject
 {
     private const int SearchDebounceMs = 250;
+    private const int SearchHistoryLimit = 8;
 
     private readonly IHistoryService _historyService;
     private readonly ISearchService _searchService;
@@ -71,6 +72,8 @@ public sealed partial class MainViewModel : ObservableObject
     public ObservableCollection<ClipboardItemViewModel> Items { get; } = [];
 
     public ICollectionView ItemsView { get; }
+
+    public ObservableCollection<string> SearchHistory { get; } = [];
 
     public IReadOnlyList<ContentTypeFilterViewModel> ContentTypeFilters { get; } = BuildContentTypeFilters();
 
@@ -298,6 +301,7 @@ public sealed partial class MainViewModel : ObservableObject
             var baseItems = _searchService.Filter(_demoItems, query);
             UpdateContentTypeFilterCounts(baseItems);
             PopulateItems(ApplyActiveFilter(baseItems));
+            RememberSearchQuery(query, Items.Count);
             return;
         }
 
@@ -306,6 +310,7 @@ public sealed partial class MainViewModel : ObservableObject
             var baseItems = await _historyService.SearchAsync(query, token);
             UpdateContentTypeFilterCounts(baseItems);
             PopulateItems(ApplyActiveFilter(baseItems));
+            RememberSearchQuery(query, Items.Count);
         }
         catch (OperationCanceledException)
         {
@@ -382,6 +387,17 @@ public sealed partial class MainViewModel : ObservableObject
         await RefreshItemsAsync();
     }
 
+    [RelayCommand]
+    private void SelectSearchHistory(string? query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return;
+        }
+
+        SearchText = query;
+    }
+
     private static IReadOnlyList<ContentTypeFilterViewModel> BuildContentTypeFilters()
     {
         return
@@ -426,6 +442,28 @@ public sealed partial class MainViewModel : ObservableObject
         foreach (var model in results)
         {
             Items.Add(new ClipboardItemViewModel(model));
+        }
+    }
+
+    private void RememberSearchQuery(string query, int resultCount)
+    {
+        var trimmed = query.Trim();
+        if (trimmed.Length < 2 || resultCount == 0)
+        {
+            return;
+        }
+
+        var existing = SearchHistory.FirstOrDefault(entry =>
+            string.Equals(entry, trimmed, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null)
+        {
+            SearchHistory.Remove(existing);
+        }
+
+        SearchHistory.Insert(0, trimmed);
+        while (SearchHistory.Count > SearchHistoryLimit)
+        {
+            SearchHistory.RemoveAt(SearchHistory.Count - 1);
         }
     }
 

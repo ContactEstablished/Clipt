@@ -168,6 +168,22 @@ public partial class MainWindow : Window
         ToggleMode();
     }
 
+    private void OnSearchHistoryClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.Button { ContextMenu: { } menu } button)
+        {
+            return;
+        }
+
+        if (_viewModel.SearchHistory.Count == 0)
+        {
+            return;
+        }
+
+        menu.PlacementTarget = button;
+        menu.IsOpen = true;
+    }
+
     private async void OnAlwaysOnTopClick(object sender, RoutedEventArgs e)
     {
         Topmost = !Topmost;
